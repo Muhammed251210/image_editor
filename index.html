@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Resim Düzenleyici: Lens & Çubuk Modu</title>
+<style>
+/* --- Temel Stil --- */
+body { 
+    margin:0; 
+    background:#111; 
+    display:flex; 
+    flex-direction:column; 
+    align-items:center; 
+    color:white; 
+    padding-bottom:40px; 
+    font-family:sans-serif; 
+}
+#container { 
+    position:relative; 
+    width:90vw; 
+    max-width:500px; 
+    height: auto; 
+    overflow:hidden; 
+    border-radius:16px; 
+    margin-top:20px; 
+    background:#222; 
+}
+img { 
+    width:100%; 
+    height: auto;
+    display:block; 
+    pointer-events:none; 
+}
+#original-img { position: relative; z-index: 1; }
+
+/* --- Çubuk Modu Öğeleri --- */
+#filtered-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 100%;
+    overflow: hidden;
+    z-index: 5;
+    opacity: 1;
+    transition: opacity 0.3s;
+}
+#filtered-img { position: absolute; top:0; left:0; width:100%; height:100%; }
+#handle { 
+    position:absolute; 
+    top:0; 
+    left:50%; 
+    width:6px; 
+    height:100%; 
+    background:white; 
+    cursor:ew-resize; 
+    border-radius:3px; 
+    z-index:10; 
+    transform: translateX(-50%); 
+}
+
+/* --- Lens Modu Öğeleri --- */
+.lens {
+    position:absolute;
+    border-radius:50%;
+    border:3px solid #fff;
+    width:150px;
+    height:150px;
+    overflow:hidden;
+    z-index:20;
+    pointer-events:none;
+    display:none;
+}
+#lens-img { position:absolute; top:0; left:0; pointer-events: none; }
+.vignette { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:15; mix-blend-mode:multiply; }
+
+/* --- Kontroller --- */
+#controls { 
+    width:90vw; 
+    max-width:500px; 
+    margin-top:20px; 
+    display:flex; 
+    flex-direction:column; 
+    gap:10px; 
+}
+#controls label { font-size:14px; }
+#controls input[type=range] { width:100%; }
+#reset, #save, #modeBtn { 
+    margin-top:10px; 
+    padding:8px 12px; 
+    border-radius:6px; 
+    cursor:pointer; 
+    border: none;
+    font-weight: bold;
+}
+#reset { background:#555; color:white; }
+#save { background:#28a745; color:white; }
+#modeBtn { background:#007bff; color:white; }
+</style>
+</head>
+<body>
+
+<input type="file" id="upload" accept="image/*" />
+<div id="container">
+    <img id="original-img" src="data:image/svg+xml;charset=utf8,%3Csvg viewBox='0 0 500 300'%3E%3Crect width='500' height='300' fill='%23333'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%23ccc'%3EResim Yükle%3C/text%3E%3C/svg%3E" alt="Orijinal Resim" />
+    <div id="filtered-container">
+        <img id="filtered-img" src="data:image/svg+xml;charset=utf8,%3Csvg viewBox='0 0 500 300'%3E%3Crect width='500' height='300' fill='%23333'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%23ccc'%3EResim Yükle%3C/text%3E%3C/svg%3E" alt="Filtreli Resim" />
+        <div class="vignette"></div>
+    </div>
+    <div id="handle"></div>
+    <div class="lens" id="lens">
+        <img id="lens-img" src="data:image/svg+xml;charset=utf8,%3Csvg viewBox='0 0 500 300'%3E%3Crect width='500' height='300' fill='%23333'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%23ccc'%3EResim Yükle%3C/text%3E%3C/svg%3E" alt="Lens İç Resim" />
+    </div>
+</div>
+
+<div id="controls">
+    <label>Kontrast <span id="cVal">100</span>%</label>
+    <input type="range" id="contrast" min="50" max="200" value="100">
+
+    <label>Parlaklık <span id="bVal">100</span>%</label>
+    <input type="range" id="brightness" min="50" max="200" value="100">
+
+    <label>Doygunluk <span id="sVal">100</span>%</label>
+    <input type="range" id="saturate" min="0" max="300" value="100">
+
+    <label>Hue Rotate <span id="hVal">0</span>°</label>
+    <input type="range" id="hue" min="0" max="360" value="0">
+
+    <label>Sepia <span id="sepVal">0</span>%</label>
+    <input type="range" id="sepia" min="0" max="100" value="0">
+
+    <label>Blur <span id="blurVal">0</span>px</label>
+    <input type="range" id="blur" min="0" max="10" value="0">
+
+    <label>Opacity <span id="opVal">100</span>%</label>
+    <input type="range" id="opacity" min="10" max="100" value="100">
+
+    <!-- Lens Boyutu -->
+    <label>Lens Boyutu <span id="lensVal">150</span>px</label>
+    <input type="range" id="lensSize" min="50" max="300" value="150">
+
+    <button id="reset">Sıfırla</button>
+    <button id="save">Kaydet</button>
+    <button id="modeBtn">Lens Modu</button>
+</div>
+
+<script>
+const upload = document.getElementById("upload");
+const container = document.getElementById("container");
+const originalImg = document.getElementById("original-img");
+const filteredContainer = document.getElementById("filtered-container");
+const filteredImg = document.getElementById("filtered-img");
+const handle = document.getElementById("handle");
+const lens = document.getElementById("lens");
+const lensImg = document.getElementById("lens-img");
+const modeBtn = document.getElementById("modeBtn");
+
+// Lens boyutu
+const lensSizeInput = document.getElementById('lensSize');
+const lensVal = document.getElementById('lensVal');
+
+lensSizeInput.addEventListener('input', ()=>{
+    const size = lensSizeInput.value;
+    lens.style.width = size + 'px';
+    lens.style.height = size + 'px';
+    lensVal.textContent = size;
+});
+
+// Filtre ve Değer Elemanları
+const filters = {
+    contrast: document.getElementById("contrast"), brightness: document.getElementById("brightness"), saturate: document.getElementById("saturate"),
+    hue: document.getElementById("hue"), sepia: document.getElementById("sepia"), blur: document.getElementById("blur"), opacity: document.getElementById("opacity")
+};
+const vals = {
+    cVal: document.getElementById("cVal"), bVal: document.getElementById("bVal"), sVal: document.getElementById("sVal"),
+    hVal: document.getElementById("hVal"), sepVal: document.getElementById("sepVal"), blurVal: document.getElementById("blurVal"), opVal: document.getElementById("opVal")
+};
+const defaultValues = { contrast: 100, brightness: 100, saturate: 100, hue:0, sepia:0, blur:0, opacity:100 };
+
+let lensMode = false;
+
+// --- Filtre Uygulama ---
+function applyFilters() {
+    const filterStr = `contrast(${filters.contrast.value}%) brightness(${filters.brightness.value}%) saturate(${filters.saturate.value}%) hue-rotate(${filters.hue.value}deg) sepia(${filters.sepia.value}%) blur(${filters.blur.value}px) opacity(${filters.opacity.value}%)`;
+    filteredImg.style.filter = filterStr;
+    lensImg.style.filter = filterStr;
+
+    vals.cVal.textContent = filters.contrast.value; vals.bVal.textContent = filters.brightness.value; vals.sVal.textContent = filters.saturate.value;
+    vals.hVal.textContent = filters.hue.value; vals.sepVal.textContent = filters.sepia.value; vals.blurVal.textContent = filters.blur.value;
+    vals.opVal.textContent = filters.opacity.value;
+}
+
+Object.values(filters).forEach(el => el.addEventListener("input", applyFilters));
+
+// --- Çubuk Modu ---
+let isDragging = false;
+function moveHandle(clientX) {
+    const rect = container.getBoundingClientRect();
+    const offsetX = Math.min(Math.max(clientX - rect.left, 0), rect.width);
+    
+    handle.style.left = offsetX + 'px';
+    filteredContainer.style.width = offsetX + 'px';
+}
+handle.addEventListener('mousedown',()=>isDragging=true);
+document.addEventListener('mouseup',()=>isDragging=false);
+document.addEventListener('mousemove',e=>{ if(isDragging) moveHandle(e.clientX); });
+handle.addEventListener('touchstart', e=>{ isDragging=true; e.preventDefault(); });
+window.addEventListener('touchend',()=>isDragging=false);
+window.addEventListener('touchmove', e=>{ if(isDragging) moveHandle(e.touches[0].clientX); });
+
+// --- Yükleme İşlevi ---
+upload.addEventListener('change', e=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const url = URL.createObjectURL(file);
+    
+    originalImg.src = url;
+    filteredImg.src = url;
+    lensImg.src = url; 
+
+    originalImg.onload = () => {
+        const renderedWidth = originalImg.offsetWidth; 
+        const renderedHeight = originalImg.offsetHeight;
+        filteredImg.style.width = renderedWidth + 'px';
+        filteredImg.style.height = renderedHeight + 'px'; 
+        lensImg.style.width = renderedWidth + 'px';
+        lensImg.style.height = renderedHeight + 'px'; 
+        applyFilters();
+        handle.style.left = '50%';
+        filteredContainer.style.width = '50%';
+    };
+});
+
+// --- Sıfırlama ---
+document.getElementById('reset').addEventListener('click', ()=>{
+    Object.keys(filters).forEach(key => { filters[key].value = defaultValues[key]; });
+    applyFilters();
+    handle.style.left = '50%';
+    filteredContainer.style.width = '50%';
+});
+
+// --- Mod Değiştirme ---
+modeBtn.addEventListener('click', ()=>{
+    lensMode = !lensMode;
+    if(lensMode){
+        lens.style.display = 'block';
+        handle.style.display = 'none';
+        filteredContainer.style.opacity = '0';
+        modeBtn.textContent = 'Çubuk Modu';
+    } else {
+        lens.style.display = 'none';
+        handle.style.display = 'block';
+        filteredContainer.style.opacity = '1';
+        filteredContainer.style.width = '50%'; 
+        modeBtn.textContent = 'Lens Modu';
+    }
+});
+
+// --- Lens Hareketi ---
+function moveLens(clientX, clientY) {
+    const rect = container.getBoundingClientRect();
+    const lensSize = lens.offsetWidth;
+    let x = clientX - rect.left - lensSize/2;
+    let y = clientY - rect.top - lensSize/2;
+    x = Math.max(0, Math.min(x, rect.width - lensSize));
+    y = Math.max(0, Math.min(y, rect.height - lensSize));
+    lens.style.left = x + 'px';
+    lens.style.top = y + 'px';
+    lensImg.style.left = -x + 'px';
+    lensImg.style.top = -y + 'px';
+}
+
+container.addEventListener('mousemove', e=>{ if(lensMode) moveLens(e.clientX, e.clientY); });
+container.addEventListener('touchmove', e=>{ if(lensMode && e.touches.length>0){ e.preventDefault(); moveLens(e.touches[0].clientX, e.touches[0].clientY); } });
+
+// --- Kaydet ---
+document.getElementById('save').addEventListener('click', () => {
+    if (!originalImg.src || originalImg.src.startsWith('data:image/svg')) { console.error("Lütfen önce bir resim yükleyin."); return; }
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = originalImg.naturalWidth;
+    canvas.height = originalImg.naturalHeight;
+    const filterStr = `contrast(${filters.contrast.value}%) brightness(${filters.brightness.value}%) saturate(${filters.saturate.value}%) hue-rotate(${filters.hue.value}deg) sepia(${filters.sepia.value}%) blur(${filters.blur.value}px)`;
+    ctx.filter = filterStr; 
+    ctx.drawImage(originalImg, 0, 0, canvas.width, canvas.height); 
+    const dataURL = canvas.toDataURL("image/jpeg", 0.9); 
+    const a = document.createElement('a');
+    a.href = dataURL;
+    a.download = 'duzenlenmis_resim.jpg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    console.log("Düzenlenmiş resim kaydedildi.");
+});
+
+applyFilters();
+</script>
+</body>
+  </html>
