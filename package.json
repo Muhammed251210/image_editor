@@ -9,5 +9,5 @@
   },
 "dependencies": {
   "openai": "^4.22.1",
-  "formidable": "^3.6.0"
+  "formidable": "^3.7.4"
 }
