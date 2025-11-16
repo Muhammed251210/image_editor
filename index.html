@@ -1,295 +1,368 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-<meta charset="UTF-8">
-<title>Fotoğraf Düzenleyici - Düzgün Lens Modu</title>
-<style>
-body { font-family: Arial, sans-serif; background: #f6f6f6; text-align: center; margin: 0; }
-#container { position: relative; display: inline-block; margin: 30px 0; background: #fff; box-shadow: 0 0 12px #ccc; }
-img { display: block; object-fit: contain; }
-#filteredContainer { position: absolute; top: 0; left: 0; height: 100%; overflow: hidden; pointer-events: none; }
-#filteredImg { position: absolute; top: 0; left: 0; }
-#handle { position: absolute; top: 0; width: 7px; height: 100%; background: #29a1f1; border-radius: 4px; cursor: ew-resize; z-index: 2; transition: background 0.2s; }
-#handle:hover { background: #1972ac; }
-#lens { position: absolute; border: 2px solid #29a1f1; border-radius: 50%; width: 150px; height: 150px; overflow: hidden; display: none; z-index: 3; pointer-events: none; background: rgba(255,255,255,0.05); }
-#lensImg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
-#controls { margin-top: 20px; }
-.filter-group { display: flex; justify-content: center; flex-wrap: wrap; gap: 24px; margin-bottom: 16px; }
-.filter-item { display: flex; flex-direction: column; align-items: center; }
-label { margin-bottom: 3px; font-weight: 500; }
-input[type="range"] { width: 120px; }
-input[type="file"] { margin-right: 10px; }
-button { margin: 0 4px; padding: 7px 14px; background: #29a1f1; border: none; color: #fff; border-radius: 5px; cursor: pointer; font-size: 1em; transition: background .2s; }
-button:hover { background: #1972ac; }
-@media(max-width:700px){
-    #container{max-width:100vw;}
-    .filter-group{flex-direction:column;align-items:center;}
-    #aiChatContainer {
-        margin: 40px auto 30px;
-        width: 80%;
-        max-width: 600px;
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        padding: 15px;
-        background: #fff;
-        text-align: left;
-    }
-    #chatOutput { height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 10px; margin-bottom: 10px; background: #f9f9f9; border-radius: 4px; }
-    #chatInputContainer { display: flex; gap: 10px; }
-    #aiPrompt { flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-    .message { margin-bottom: 5px; padding: 5px 8px; border-radius: 5px; }
-    .user-msg { background: #e1f5fe; text-align: right; }
-    .ai-msg { background: #f1f8e9; text-align: left; }
-}
-</style>
+    <meta charset="UTF-8">
+    <title>Fotoğraf Düzenleyici - Düzgün Lens Modu</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f6f6f6; text-align: center; margin: 0; }
+        #container { position: relative; display: inline-block; margin: 30px 0; background: #fff; box-shadow: 0 0 12px #ccc; }
+        img { display: block; object-fit: contain; }
+        #filteredContainer { position: absolute; top: 0; left: 0; height: 100%; overflow: hidden; pointer-events: none; }
+        #filteredImg { position: absolute; top: 0; left: 0; }
+        #handle { position: absolute; top: 0; width: 7px; height: 100%; background: #29a1f1; border-radius: 4px; cursor: ew-resize; z-index: 2; transition: background 0.2s; }
+        #handle:hover { background: #1972ac; }
+        #lens { position: absolute; border: 2px solid #29a1f1; border-radius: 50%; width: 150px; height: 150px; overflow: hidden; display: none; z-index: 3; pointer-events: none; background: rgba(255,255,255,0.05); }
+        #lensImg {  
+            position: absolute;  
+            top: 0;  
+            left: 0;
+            width: 100%;  
+            height: 100%;
+            object-fit: contain;
+        }
+        #controls { margin-top: 20px; }
+        .filter-group { display: flex; justify-content: center; flex-wrap: wrap; gap: 24px; margin-bottom: 16px; }
+        .filter-item { display: flex; flex-direction: column; align-items: center; }
+        label { margin-bottom: 3px; font-weight: 500; }
+        input[type="range"] { width: 120px; }
+        input[type="file"] { margin-right: 10px; }
+        button { margin: 0 4px; padding: 7px 14px; background: #29a1f1; border: none; color: #fff; border-radius: 5px; cursor: pointer; font-size: 1em; transition: background .2s; }
+        button:hover { background: #1972ac; }
+        @media(max-width:700px){
+            #container{max-width:100vw;}
+            .filter-group{flex-direction:column;align-items:center;}
+        #aiChatContainer {
+            margin: 40px auto 30px;
+            width: 80%;
+            max-width: 600px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 15px;
+            background: #fff;
+            text-align: left;
+        }
+        #chatOutput {
+            height: 150px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+        #chatInputContainer {
+            display: flex;
+            gap: 10px;
+        }
+        #aiPrompt {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .message {
+            margin-bottom: 5px;
+            padding: 5px 8px;
+            border-radius: 5px;
+        }
+        .user-msg {
+            background: #e1f5fe;
+            text-align: right;
+        }
+        .ai-msg {
+            background: #f1f8e9;
+            text-align: left;
+        }
+        }
+    </style>
 </head>
 <body>
-<h2>Fotoğraf Düzenleyici</h2>
-
-<div id="controls">
-    <input type="file" id="upload" accept="image/*">
-    <button id="modeBtn">Lens Modu</button>
-    <button id="reset">Sıfırla</button>
-    <button id="save">Kaydet</button>
-</div>
-
-<div id="container" style="width:480px; height:300px;">
-    <img id="originalImg" src="https://dummyimage.com/480x300/cccccc/464646.png&text=Resim+yükle" style="width:100%;height:100%;object-fit:contain;">
-    <div id="filteredContainer" style="width:50%;height:100%;">
-        <img id="filteredImg" src="https://dummyimage.com/480x300/cccccc/464646.png&text=Resim+yükle" style="width:100%;height:100%;object-fit:contain;">
+    <h2>Fotoğraf Düzenleyici</h2>
+    
+    <div id="controls">
+        <input type="file" id="upload" accept="image/*">
+        <button id="modeBtn">Lens Modu</button>
+        <button id="reset">Sıfırla</button>
+        <button id="save">Kaydet</button>
     </div>
-    <div id="handle" style="left:50%;"></div>
-    <div id="lens" style="left:0;top:0;">
-        <img id="lensImg" src="https://dummyimage.com/480x300/cccccc/464646.png&text=Resim+yükle">
+    <div id="container" style="width:480px; height:300px;">
+        <img id="originalImg" src="https://dummyimage.com/480x300/cccccc/464646.png&text=Resim+yükle" style="width:100%;height:100%;object-fit:contain;">
+        <div id="filteredContainer" style="width:50%;height:100%;">
+            <img id="filteredImg" src="https://dummyimage.com/480x300/cccccc/464646.png&text=Resim+yükle" style="width:100%;height:100%;object-fit:contain;">
+        </div>
+        <div id="handle" style="left:50%;"></div>
+        <div id="lens" style="left:0;top:0;">
+            <img id="lensImg" src="https://dummyimage.com/480x300/cccccc/464646.png&text=Resim+yükle">
+        </div>
     </div>
-</div>
-
 <div id="aiChatContainer">
-    <h3>🤖 YZ Görüntü Düzenleme Sohbeti</h3>
-    <p>Lütfen maskelenen alana (görünür filtreli alan) ne eklemek/değiştirmek istediğinizi yazın.</p>
-    <div id="chatOutput">
-        <div class="message ai-msg">Merhaba! Lütfen ne yapacağımı söyleyin (örnek: "Arka plana bir ağaç ekle" veya "Kapıyı kırmızıya boya").</div>
+        <h3>🤖 YZ Görüntü Düzenleme Sohbeti</h3>
+        <p>Lütfen maskelenen alana (görünür filtreli alan) ne eklemek/değiştirmek istediğinizi yazın.</p>
+        <div id="chatOutput">
+            <div class="message ai-msg">Merhaba! Lütfen ne yapacağımı söyleyin (örnek: "Arka plana bir ağaç ekle" veya "Kapıyı kırmızıya boya").</div>
+        </div>
+        <div id="chatInputContainer">
+            <input type="text" id="aiPrompt" placeholder="Buraya yazın...">
+            <button id="sendPromptBtn">Gönder</button>
+        </div>
+        <div id="aiResultContainer" style="margin-top: 15px; text-align: center;">
+            <img id="aiResultImg" style="max-width: 100%; display: none; border: 1px solid #ddd; border-radius: 4px;">
+            <button id="saveAiResultBtn" style="display:none; margin-top: 10px;">Yeni Resmi Kaydet</button>
+        </div>
     </div>
-    <div id="chatInputContainer">
-        <input type="text" id="aiPrompt" placeholder="Buraya yazın...">
-        <button id="sendPromptBtn">Gönder</button>
+    
+    <div class="filter-group">
+        <div class="filter-item">
+            <label for="contrast">Kontrast</label>
+            <input type="range" id="contrast" min="0" max="200" value="100">
+        </div>
+        <div class="filter-item">
+            <label for="brightness">Parlaklık</label>
+            <input type="range" id="brightness" min="0" max="200" value="100">
+        </div>
+        <div class="filter-item">
+            <label for="saturate">Doygunluk</label>
+            <input type="range" id="saturate" min="0" max="200" value="100">
+        </div>
+        <div class="filter-item">
+            <label for="hue">Renk</label>
+            <input type="range" id="hue" min="0" max="360" value="0">
+        </div>
+        <div class="filter-item">
+            <label for="sepia">Sepya</label>
+            <input type="range" id="sepia" min="0" max="100" value="0">
+        </div>
+        <div class="filter-item">
+            <label for="blur">Bulanık</label>
+            <input type="range" id="blur" min="0" max="10" value="0" step="0.2">
+        </div>
     </div>
-    <div id="aiResultContainer" style="margin-top: 15px; text-align: center;">
-        <img id="aiResultImg" style="max-width: 100%; display: none; border: 1px solid #ddd; border-radius: 4px;">
-        <button id="saveAiResultBtn" style="display:none; margin-top: 10px;">Yeni Resmi Kaydet</button>
-    </div>
-</div>
-
-<div class="filter-group">
-    <div class="filter-item">
-        <label for="contrast">Kontrast</label>
-        <input type="range" id="contrast" min="0" max="200" value="100">
-    </div>
-    <div class="filter-item">
-        <label for="brightness">Parlaklık</label>
-        <input type="range" id="brightness" min="0" max="200" value="100">
-    </div>
-    <div class="filter-item">
-        <label for="saturate">Doygunluk</label>
-        <input type="range" id="saturate" min="0" max="200" value="100">
-    </div>
-    <div class="filter-item">
-        <label for="hue">Renk</label>
-        <input type="range" id="hue" min="0" max="360" value="0">
-    </div>
-    <div class="filter-item">
-        <label for="sepia">Sepya</label>
-        <input type="range" id="sepia" min="0" max="100" value="0">
-    </div>
-    <div class="filter-item">
-        <label for="blur">Bulanık</label>
-        <input type="range" id="blur" min="0" max="10" value="0" step="0.2">
-    </div>
-</div>
-
-<script>
-const filters = {
-    contrast: document.getElementById('contrast'),
-    brightness: document.getElementById('brightness'),
-    saturate: document.getElementById('saturate'),
-    hue: document.getElementById('hue'),
-    sepia: document.getElementById('sepia'),
-    blur: document.getElementById('blur'),
-};
-const defaultValues = {contrast:100,brightness:100,saturate:100,hue:0,sepia:0,blur:0};
-
-const upload = document.getElementById('upload');
-const container = document.getElementById('container');
-const originalImg = document.getElementById('originalImg');
-const filteredImg = document.getElementById('filteredImg');
-const filteredContainer = document.getElementById('filteredContainer');
-const handle = document.getElementById('handle');
-const lens = document.getElementById('lens');
-const lensImg = document.getElementById('lensImg');
-const modeBtn = document.getElementById('modeBtn');
-let lensMode = false;
-
-function applyFilters(){
-    const filterStr = `contrast(${filters.contrast.value}%) brightness(${filters.brightness.value}%) saturate(${filters.saturate.value}%) hue-rotate(${filters.hue.value}deg) sepia(${filters.sepia.value}%) blur(${filters.blur.value}px)`;
-    filteredImg.style.filter = filterStr;
-    lensImg.style.filter = filterStr;
-}
-Object.values(filters).forEach(el=>el.addEventListener("input",applyFilters));
-
-let isDragging=false;
-function moveHandle(clientX){
-    const rect=container.getBoundingClientRect();
-    const offsetX=Math.min(Math.max(clientX-rect.left,0),rect.width);
-    handle.style.left=`${offsetX}px`;
-    filteredContainer.style.width=`${offsetX}px`;
-}
-handle.addEventListener('mousedown',()=>isDragging=true);
-document.addEventListener('mouseup',()=>isDragging=false);
-document.addEventListener('mousemove',e=>{if(isDragging) moveHandle(e.clientX);});
-handle.addEventListener('touchstart',e=>{isDragging=true;e.preventDefault();});
-window.addEventListener('touchend',()=>isDragging=false);
-window.addEventListener('touchmove',e=>{if(isDragging) moveHandle(e.touches[0].clientX);});
-
-function updateLensImageSize(){
-    lensImg.style.width="100%";
-    lensImg.style.height="100%";
-}
-upload.addEventListener('change',e=>{
-    const file=e.target.files[0];
-    if(!file) return;
-    const url=URL.createObjectURL(file);
-    originalImg.src=url;
-    filteredImg.src=url;
-    lensImg.src=url;
-    originalImg.onload=()=>{
-        filteredImg.style.width=originalImg.offsetWidth+'px';
-        filteredImg.style.height=originalImg.offsetHeight+'px';
-        updateLensImageSize();
-        applyFilters();
-        handle.style.left='50%';
-        filteredContainer.style.width='50%';
+    
+    <script>
+    const filters = {
+        contrast: document.getElementById('contrast'),
+        brightness: document.getElementById('brightness'),
+        saturate: document.getElementById('saturate'),
+        hue: document.getElementById('hue'),
+        sepia: document.getElementById('sepia'),
+        blur: document.getElementById('blur'),
     };
-});
+    const defaultValues = {
+        contrast: 100,
+        brightness: 100,
+        saturate: 100,
+        hue: 0,
+        sepia: 0,
+        blur: 0,
+    };
 
-document.getElementById('reset').addEventListener('click',()=>{
-    Object.keys(filters).forEach(k=>filters[k].value=defaultValues[k]);
-    applyFilters();
-    handle.style.left='50%';
-    filteredContainer.style.width='50%';
-    updateLensImageSize();
-});
+    const upload = document.getElementById('upload');
+    const container = document.getElementById('container');
+    const originalImg = document.getElementById('originalImg');
+    const filteredImg = document.getElementById('filteredImg');
+    const filteredContainer = document.getElementById('filteredContainer');
+    const handle = document.getElementById('handle');
+    const lens = document.getElementById('lens');
+    const lensImg = document.getElementById('lensImg');
+    const modeBtn = document.getElementById('modeBtn');
 
-modeBtn.addEventListener('click',()=>{
-    lensMode=!lensMode;
-    if(lensMode){
-        lens.style.display='block';
-        handle.style.display='none';
-        filteredContainer.style.opacity='0';
-        modeBtn.textContent='Çubuk Modu';
+    let lensMode = false;
+
+    function applyFilters(){
+        const filterStr =  
+            `contrast(${filters.contrast.value}%)
+            brightness(${filters.brightness.value}%)
+            saturate(${filters.saturate.value}%)
+            hue-rotate(${filters.hue.value}deg)
+            sepia(${filters.sepia.value}%)
+            blur(${filters.blur.value}px)`
+        .replace(/\s+/g, ' ');
+        filteredImg.style.filter = filterStr;
+        lensImg.style.filter = filterStr;
+    }
+    Object.values(filters).forEach(el => el.addEventListener("input", applyFilters));
+
+    // Çubuk ve mouse hareketleri
+    let isDragging = false;
+    function moveHandle(clientX) {
+        const rect = container.getBoundingClientRect();
+        const offsetX = Math.min(Math.max(clientX - rect.left, 0), rect.width);
+        handle.style.left = `${offsetX}px`;
+        filteredContainer.style.width = `${offsetX}px`;
+    }
+    handle.addEventListener('mousedown', () => isDragging = true);
+    document.addEventListener('mouseup', () => isDragging = false);
+    document.addEventListener('mousemove', e => { if (isDragging) moveHandle(e.clientX); });
+    handle.addEventListener('touchstart', e => { isDragging = true; e.preventDefault(); });
+    window.addEventListener('touchend', () => isDragging = false);
+    window.addEventListener('touchmove', e => { if (isDragging) moveHandle(e.touches[0].clientX); });
+
+    function updateLensImageSize() {
+        lensImg.style.width = "100%";
+        lensImg.style.height = "100%";
+    }
+    upload.addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        originalImg.src = url;
+        filteredImg.src = url;
+        lensImg.src = url;
+        originalImg.onload = () => {
+            filteredImg.style.width = originalImg.offsetWidth + 'px';
+            filteredImg.style.height = originalImg.offsetHeight + 'px';
+            updateLensImageSize();
+            applyFilters();
+            handle.style.left = '50%';
+            filteredContainer.style.width = '50%';
+        };
+    });
+
+    document.getElementById('reset').addEventListener('click', () => {
+        Object.keys(filters).forEach(key => { filters[key].value = defaultValues[key]; });
+        applyFilters();
+        handle.style.left = '50%';
+        filteredContainer.style.width = '50%';
         updateLensImageSize();
-    }else{
-        lens.style.display='none';
-        handle.style.display='block';
-        filteredContainer.style.opacity='1';
-        filteredContainer.style.width='50%';
-        modeBtn.textContent='Lens Modu';
+    });
+
+    modeBtn.addEventListener('click', () => {
+        lensMode = !lensMode;
+        if (lensMode) {
+            lens.style.display = 'block';
+            handle.style.display = 'none';
+            filteredContainer.style.opacity = '0';
+            modeBtn.textContent = 'Çubuk Modu';
+            updateLensImageSize();
+        } else {
+            lens.style.display = 'none';
+            handle.style.display = 'block';
+            filteredContainer.style.opacity = '1';
+            filteredContainer.style.width = '50%';
+            modeBtn.textContent = 'Lens Modu';
+        }
+    });
+
+    function moveLens(clientX, clientY) {
+        const rect = container.getBoundingClientRect();
+        const lensSize = lens.offsetWidth;
+        let x = clientX - rect.left - lensSize / 2;
+        let y = clientY - rect.top - lensSize / 2;
+        x = Math.max(0, Math.min(x, rect.width - lensSize));
+        y = Math.max(0, Math.min(y, rect.height - lensSize));
+        lens.style.left = `${x}px`;
+        lens.style.top = `${y}px`;
+        lensImg.style.left = `${-x}px`;
+        lensImg.style.top = `${-y}px`;
     }
-});
+    container.addEventListener('mousemove', e => { if (lensMode) moveLens(e.clientX, e.clientY); });
+    container.addEventListener('touchmove', e => { if (lensMode && e.touches.length>0) { e.preventDefault(); moveLens(e.touches[0].clientX, e.touches[0].clientY); } });
 
-function moveLens(clientX,clientY){
-    const rect=container.getBoundingClientRect();
-    const lensSize=lens.offsetWidth;
-    let x=clientX-rect.left-lensSize/2;
-    let y=clientY-rect.top-lensSize/2;
-    x=Math.max(0,Math.min(x,rect.width-lensSize));
-    y=Math.max(0,Math.min(y,rect.height-lensSize));
-    lens.style.left=`${x}px`;
-    lens.style.top=`${y}px`;
-    lensImg.style.left=`${-x}px`;
-    lensImg.style.top=`${-y}px`;
-}
+    document.getElementById('save').addEventListener('click', () => {
+        if (!originalImg.src || originalImg.src.includes('dummyimage')) return;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = originalImg.naturalWidth;
+        canvas.height = originalImg.naturalHeight;
+        const filterStr = `contrast(${filters.contrast.value}%) brightness(${filters.brightness.value}%) saturate(${filters.saturate.value}%) hue-rotate(${filters.hue.value}deg) sepia(${filters.sepia.value}%) blur(${filters.blur.value}px)`;
+        ctx.filter = filterStr;
+        ctx.drawImage(originalImg, 0, 0, canvas.width, canvas.height);
+        const dataURL = canvas.toDataURL("image/jpeg", 0.9);
+        const a = document.createElement('a');
+        a.href = dataURL;
+        a.download = 'duzenlenmis_resim.jpg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    });
 
-container.addEventListener('mousemove',e=>{if(lensMode) moveLens(e.clientX,e.clientY);});
-container.addEventListener('touchmove',e=>{if(lensMode&&e.touches.length>0){e.preventDefault(); moveLens(e.touches[0].clientX,e.touches[0].clientY);}});
+    // AI Chat
+    const aiPromptInput = document.getElementById('aiPrompt');
+    const sendPromptBtn = document.getElementById('sendPromptBtn');
+    const chatOutput = document.getElementById('chatOutput');
+    const aiResultImg = document.getElementById('aiResultImg');
+    const saveAiResultBtn = document.getElementById('saveAiResultBtn');
 
-document.getElementById('save').addEventListener('click',()=>{
-    if(!originalImg.src||originalImg.src.includes('dummyimage')) return;
-    const canvas=document.createElement('canvas');
-    const ctx=canvas.getContext('2d');
-    canvas.width=originalImg.naturalWidth;
-    canvas.height=originalImg.naturalHeight;
-    ctx.filter=`contrast(${filters.contrast.value}%) brightness(${filters.brightness.value}%) saturate(${filters.saturate.value}%) hue-rotate(${filters.hue.value}deg) sepia(${filters.sepia.value}%) blur(${filters.blur.value}px)`;
-    ctx.drawImage(originalImg,0,0,canvas.width,canvas.height);
-    const a=document.createElement('a');
-    a.href=canvas.toDataURL("image/jpeg",0.9);
-    a.download='duzenlenmis_resim.jpg';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-});
-
-applyFilters();
-
-// --- AI Edit ---
-const aiPromptInput=document.getElementById('aiPrompt');
-const sendPromptBtn=document.getElementById('sendPromptBtn');
-const chatOutput=document.getElementById('chatOutput');
-const aiResultImg=document.getElementById('aiResultImg');
-const saveAiResultBtn=document.getElementById('saveAiResultBtn');
-
-function addMessage(message,type){
-    const msgDiv=document.createElement('div');
-    msgDiv.className=`message ${type}-msg`;
-    msgDiv.textContent=message;
-    chatOutput.appendChild(msgDiv);
-    chatOutput.scrollTop=chatOutput.scrollHeight;
-}
-
-async function createMaskFromHandle(){
-    const rect=container.getBoundingClientRect();
-    const maskWidth=filteredContainer.offsetWidth;
-    const canvas=document.createElement('canvas');
-    const ctx=canvas.getContext('2d');
-    canvas.width=originalImg.naturalWidth;
-    canvas.height=originalImg.naturalHeight;
-    ctx.fillStyle='white';
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    const proportion=maskWidth/rect.width;
-    const naturalMaskWidth=canvas.width*proportion;
-    ctx.clearRect(0,0,naturalMaskWidth,canvas.height);
-    return new Promise(resolve=>canvas.toBlob(blob=>resolve(blob),'image/png'));
-}
-
-async function sendImageEditRequest(prompt){
-    if(!originalImg.src||originalImg.src.includes('dummyimage')){
-        addMessage("Lütfen önce bir resim yükleyin.","ai");
-        return;
+    function addMessage(message, type) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${type}-msg`;
+        msgDiv.textContent = message;
+        chatOutput.appendChild(msgDiv);
+        chatOutput.scrollTop = chatOutput.scrollHeight;
     }
-    addMessage("İsteğiniz işleniyor...","ai");
-    sendPromptBtn.disabled=true;
-    try{
-        const originalBlob=await fetch(originalImg.src).then(r=>r.blob());
-        const maskBlob=await createMaskFromHandle();
-        const formData=new FormData();
-        formData.append('image',originalBlob,'original.png');
-        formData.append('mask',maskBlob,'mask.png');
-        formData.append('prompt',prompt);
-        const response=await fetch('/api/edit-image',{method:'POST',body:formData});
-        const data=await response.json();
-        if(response.ok){
-            aiResultImg.src=data.url;
-            aiResultImg.style.display='block';
-            saveAiResultBtn.style.display='block';
-            addMessage("Düzenleme tamamlandı. Yeni resim aşağıdadır.","ai");
-        }else addMessage(`Hata: ${data.error}`,"ai");
-    }catch(err){
-        addMessage(`Beklenmedik hata: ${err.message}`,"ai");
-    }finally{sendPromptBtn.disabled=false;}
-}
 
-sendPromptBtn.addEventListener('click',()=>{const p=aiPromptInput.value.trim(); if(p){addMessage(p,"user");sendImageEditRequest(p); aiPromptInput.value='';}});
-aiPromptInput.addEventListener('keypress',e=>{if(e.key==='Enter') sendPromptBtn.click();});
-saveAiResultBtn.addEventListener('click',()=>{if(aiResultImg.src){const a=document.createElement('a');a.href=aiResultImg.src;a.download='ai_duzenlenmis_resim.png';document.body.appendChild(a);a.click();document.body.removeChild(a);}});
-</script>
+    function createMaskFromHandle() {
+        const rect = container.getBoundingClientRect();
+        const maskWidth = filteredContainer.offsetWidth;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = originalImg.naturalWidth;
+        canvas.height = originalImg.naturalHeight;
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const proportion = maskWidth / rect.width;
+        const naturalMaskWidth = canvas.width * proportion;
+        ctx.clearRect(0, 0, naturalMaskWidth, canvas.height);
+        return new Promise(resolve => canvas.toBlob(blob => resolve(blob), 'image/png'));
+    }
+
+    async function sendImageEditRequest(prompt) {
+        if (!originalImg.src || originalImg.src.includes('dummyimage')) {
+            addMessage("Lütfen önce bir resim yükleyin.", "ai");
+            return;
+        }
+
+        addMessage("İsteğiniz işleniyor...", "ai");
+        sendPromptBtn.disabled = true;
+
+        try {
+            const originalBlob = await fetch(originalImg.src).then(r=>r.blob());
+            const maskBlob = await createMaskFromHandle();
+            const formData = new FormData();
+            formData.append('image', originalBlob, 'original.png');
+            formData.append('mask', maskBlob, 'mask.png');
+            formData.append('prompt', prompt);
+            formData.append('n', 1);
+            formData.append('size', '512x512');
+
+            const response = await fetch("/api/edit-image", { method:"POST", body:formData });
+            const data = await response.json();
+
+            if (response.ok) {
+                const newImageUrl = data.url;
+                aiResultImg.src = newImageUrl;
+                aiResultImg.style.display = 'block';
+                saveAiResultBtn.style.display = 'block';
+                addMessage("Düzenleme tamamlandı. Yeni resim aşağıdadır.", "ai");
+            } else {
+                addMessage(`Hata: ${data.error}`, "ai");
+            }
+
+        } catch (error) {
+            addMessage(`Beklenmedik hata: ${error.message}`, "ai");
+            console.error(error);
+        } finally { sendPromptBtn.disabled = false; }
+    }
+
+    sendPromptBtn.addEventListener('click', () => {
+        const prompt = aiPromptInput.value.trim();
+        if (prompt) { addMessage(prompt,"user"); sendImageEditRequest(prompt); aiPromptInput.value=''; }
+    });
+
+    aiPromptInput.addEventListener('keypress', e => { if(e.key==='Enter') sendPromptBtn.click(); });
+
+    saveAiResultBtn.addEventListener('click', () => {
+        if(aiResultImg.src){
+            const a=document.createElement('a');
+            a.href=aiResultImg.src;
+            a.download='ai_duzenlenmis_resim.png';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    });
+
+    applyFilters();
+    </script>
 </body>
 </html>
