@@ -2,16 +2,16 @@
   "name": "image-editor",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "vercel dev",
     "build": "echo 'Nothing to build for static site'",
     "start": "vercel dev"
   },
-"dependencies": {
-  "openai": "^4.22.1",
-  "formidable": "^3.2.3"
-},
-  "engines": {
-    "node": "22.x"
+  "dependencies": {
+    "openai": "^4.22.1",
+    "formidable": "^3.2.3"
   }
 }
