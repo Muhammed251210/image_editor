@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   if (!OPENAI_API_KEY) return res.status(500).json({ error: "API key missing" });
 
   const form = new formidable.IncomingForm();
-  
+
   form.parse(req, async (err, fields, files) => {
     if (err) return res.status(500).json({ error: err.message });
 
