@@ -7,8 +7,7 @@
     "build": "echo 'Nothing to build for static site'",
     "start": "vercel dev"
   },
-  "dependencies": {
-    "openai": "^4.22.1",
-    "formidable": "^3.6.4"
-  }
+"dependencies": {
+  "openai": "^4.22.1",
+  "formidable": "^3.6.0"
 }
