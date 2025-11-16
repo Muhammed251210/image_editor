@@ -39,7 +39,7 @@ export default async function handler(req, res) {
         mask: maskFile ? fs.createReadStream(maskFile.filepath) : undefined,
         prompt,
         n: 1,
-        size: "512x512",
+        size: "256x256",
       });
 
       // Geçici dosyaları silmek istersen
