@@ -4,19 +4,31 @@
 <meta charset="UTF-8">
 <title>Fotoğraf Düzenleyici</title>
 <style>
+/* ... (Tüm CSS Stilleri) ... */
 body { font-family: Arial,sans-serif; background:#f6f6f6; text-align:center; margin:0; }
 #container { position: relative; display: inline-block; margin:30px 0; background:#fff; box-shadow:0 0 12px #ccc; max-width:100vw; }
+#container.dragover { border: 3px dashed #29a1f1; background: #f0f8ff; box-shadow: 0 0 15px #aaa; }
 #container img { display: block; width:100%; height:100%; object-fit:contain; }
 #filteredContainer { position:absolute; top:0; left:0; height:100%; overflow:hidden; pointer-events:none; }
+#vignetteOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; box-shadow: inset 0 0 0px 0px rgba(0,0,0,0); transition: box-shadow 0.1s linear; }
 #filteredImg { position:absolute; top:0; left:0; width:100%; height:100%; object-fit:contain; }
 #handle { position:absolute; top:0; width:7px; height:100%; background:#29a1f1; border-radius:4px; cursor:ew-resize; z-index:2; transition:background .2s; }
 #handle:hover { background:#1972ac; }
 #lens { position:absolute; border:2px solid #29a1f1; border-radius:50%; width:150px; height:150px; overflow:hidden; display:none; z-index:3; pointer-events:none; background:rgba(255,255,255,0.05); }
-#lensImg { position:absolute; top:0; left:0; object-fit:contain; }
+#lensImg { position:absolute; object-fit:contain; }
 #controls { margin-top:20px; display:flex; flex-wrap:wrap; justify-content:center; gap:10px; }
+.history-controls { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+.transform-controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 15px; }
+.crop-controls { display: none; gap: 10px; justify-content: center; margin-top: 15px; }
+.crop-controls button.confirm { background: #28a745; }
+.crop-controls button.confirm:hover { background: #218838; }
+.crop-controls button.cancel { background: #dc3545; }
+.crop-controls button.cancel:hover { background: #c82333; }
 button,input[type=file] { padding:7px 14px; border:none; border-radius:5px; cursor:pointer; font-size:1em; }
 button { background:#29a1f1; color:#fff; transition:background .2s; }
 button:hover { background:#1972ac; }
+button:disabled { background: #cccccc; color: #666666; cursor: not-allowed; }
+button:disabled:hover { background: #cccccc; }
 .filter-group { display:flex; flex-wrap:wrap; justify-content:center; gap:24px; margin-bottom:16px; }
 .filter-item { display:flex; flex-direction:column; align-items:center; }
 label { margin-bottom:3px; font-weight:500; }
@@ -24,253 +36,771 @@ input[type=range] { width:120px; }
 .presets { display:flex; gap:10px; justify-content:center; margin-bottom:16px; flex-wrap:wrap; }
 .presets button { background:#555; color:#fff; }
 .presets button:hover { background:#333; }
+
+#cropContainer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 10;
+    display: none;
+    touch-action: none;
+    pointer-events: none; /* DÜZELTME: Varsayılan olarak tıklanamaz */
+}
+.crop-overlay {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.5);
+}
+#cropBox {
+    position: absolute;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+    border: 1px dashed #ffffff;
+    cursor: move;
+}
+.crop-handle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #29a1f1;
+    border: 1px solid #fff;
+    border-radius: 2px;
+}
+.handle-nw { top: -6px; left: -6px; cursor: nwse-resize; }
+.handle-ne { top: -6px; right: -6px; cursor: nesw-resize; }
+.handle-sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+.handle-se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+.handle-n { top: -6px; left: 50%; margin-left: -6px; cursor: ns-resize; }
+.handle-s { bottom: -6px; left: 50%; margin-left: -6px; cursor: ns-resize; }
+.handle-w { top: 50%; margin-top: -6px; left: -6px; cursor: ew-resize; }
+.handle-e { top: 50%; margin-top: -6px; right: -6px; cursor: ew-resize; }
+
+body.cropping .filter-group,
+body.cropping .presets,
+body.cropping .transform-controls,
+body.cropping #controls,
+body.cropping .history-controls,
+body.cropping #handle,
+body.cropping #lens {
+    display: none;
+}
+body.cropping .crop-controls {
+    display: flex;
+}
 @media(max-width:700px){ .filter-group{flex-direction:column;align-items:center;} .presets{flex-direction:column;align-items:center;} }
 </style>
 </head>
-<body>
+<body id="appBody"> 
 <h2>Fotoğraf Düzenleyici</h2>
 
 <div id="controls">
-<input type="file" id="upload" accept="image/*">
-<button id="modeBtn">Lens Modu</button>
-<button id="reset">Sıfırla</button>
-<button id="save">Kaydet</button>
+    <input type="file" id="upload" accept="image/*">
+    <button id="cropBtn">Kırp</button>
+    <button id="modeBtn">Lens Modu</button>
+    <button id="reset">Sıfırla</button>
+    <button id="save">Kaydet</button>
+</div>
+
+<div class="crop-controls">
+    <button id="confirmCrop" class="confirm">Onayla</button>
+    <button id="cancelCrop" class="cancel">İptal</button>
+</div>
+
+<div class="history-controls">
+    <button id="undo" disabled>Geri Al</button>
+    <button id="redo" disabled>İleri Al</button>
+</div>
+
+<div class="transform-controls">
+    <button id="rotateLeft" title="Sola Döndür">Sol 90°</button>
+    <button id="rotateRight" title="Sağa Döndür">Sağ 90°</button>
+    <button id="flipX" title="Yatay Çevir">Yatay Çevir</button>
+    <button id="flipY" title="Dikey Çevir">Dikey Çevir</button>
 </div>
 
 <div class="presets">
-<button data-preset="normal">Normal</button>
-<button data-preset="bw">B/W</button>
-<button data-preset="sepia">Sepya</button>
-<button data-preset="highcontrast">Yüksek Kontrast</button>
-<button data-preset="vivid">Canlı</button>
+    <button data-preset="normal">Normal</button>
+    <button data-preset="bw">B/W</button>
+    <button data-preset="sepia">Sepya</button>
+    <button data-preset="highcontrast">Yüksek Kontrast</button>
+    <button data-preset="vivid">Canlı</button>
 </div>
 
 <div id="container" style="width:480px; height:300px;">
-<img id="originalImg" src="https://dummyimage.com/480x300/cccccc/464646.png&text=Resim+yükle">
-<div id="filteredContainer" style="width:50%;height:100%;">
-<img id="filteredImg" src="https://dummyimage.com/480x300/cccccc/464646.png&text=Resim+yükle">
-</div>
-<div id="handle" style="left:50%;"></div>
-<div id="lens">
-<img id="lensImg" src="https://dummyimage.com/480x300/cccccc/464646.png&text=Resim+yükle">
-</div>
+    <img id="originalImg" src="https://dummyimage.com/480x300/cccccc/464646.png&text=Resim+yükle">
+    <div id="filteredContainer" style="width:50%;height:100%;">
+        <img id="filteredImg" src="https://dummyimage.com/480x300/cccccc/464646.png&text=Resim+yükle">
+        <div id="vignetteOverlay"></div>
+    </div>
+    <div id="handle" style="left:50%;"></div>
+    <div id="lens">
+        <img id="lensImg" src="https://dummyimage.com/480x300/cccccc/464646.png&text=Resim+yükle">
+    </div>
+    <div id="cropContainer">
+        <div id="cropBox">
+            <div class="crop-handle handle-nw"></div>
+            <div class="crop-handle handle-ne"></div>
+            <div class="crop-handle handle-sw"></div>
+            <div class="crop-handle handle-se"></div>
+            <div class="crop-handle handle-n"></div>
+            <div class="crop-handle handle-s"></div>
+            <div class="crop-handle handle-w"></div>
+            <div class="crop-handle handle-e"></div>
+        </div>
+    </div>
 </div>
 
 <div class="filter-group">
-<div class="filter-item"><label>Kontrast</label><input type="range" id="contrast" min="0" max="200" value="100"></div>
-<div class="filter-item"><label>Parlaklık</label><input type="range" id="brightness" min="0" max="200" value="100"></div>
-<div class="filter-item"><label>Doygunluk</label><input type="range" id="saturate" min="0" max="200" value="100"></div>
-<div class="filter-item"><label>Renk</label><input type="range" id="hue" min="0" max="360" value="0"></div>
-<div class="filter-item"><label>Sepya</label><input type="range" id="sepia" min="0" max="100" value="0"></div>
-<div class="filter-item"><label>Bulanık</label><input type="range" id="blur" min="0" max="10" value="0" step="0.2"></div>
-<div class="filter-item"><label>Vignette</label><input type="range" id="vignette" min="0" max="100" value="0"></div>
-<div class="filter-item"><label>Sharpen</label><input type="range" id="sharpen" min="0" max="5" value="0" step="0.1"></div>
-<div class="filter-item"><label>Gamma</label><input type="range" id="gamma" min="0.1" max="3" value="1" step="0.1"></div>
-<div class="filter-item"><label>Invert</label><input type="range" id="invert" min="0" max="100" value="0"></div>
-<div class="filter-item"><label>Grayscale</label><input type="range" id="grayscale" min="0" max="100" value="0"></div>
+    <div class="filter-item"><label>Kontrast</label><input type="range" id="contrast" min="0" max="200" value="100"></div>
+    <div class="filter-item"><label>Parlaklık</label><input type="range" id="brightness" min="0" max="200" value="100"></div>
+    <div class="filter-item"><label>Doygunluk</label><input type="range"id="saturate" min="0" max="200" value="100"></div>
+    <div class="filter-item"><label>Renk</label><input type="range" id="hue" min="0" max="360" value="0"></div>
+    <div class="filter-item"><label>Sepya</label><input type="range" id="sepia" min="0" max="100" value="0"></div>
+    <div class="filter-item"><label>Bulanık</label><input type="range" id="blur" min="0" max="10" value="0" step="0.2"></div>
+    <div class="filter-item"><label>Vignette</label><input type="range" id="vignette" min="0" max="100" value="0"></div>
+    <div class="filter-item"><label>Sharpen</label><input type="range" id="sharpen" min="0" max="5" value="0" step="0.1"></div>
+    <div class="filter-item"><label>Gamma</label><input type="range" id="gamma" min="0.1" max="3" value="1" step="0.1"></div>
+    <div class="filter-item"><label>Invert</label><input type="range" id="invert" min="0" max="100" value="0"></div>
+    <div class="filter-item"><label>Grayscale</label><input type="range" id="grayscale" min="0" max="100" value="0"></div>
 </div>
 
 <script>
+// == 1. DOM Elemanlarını Seçme ==
 const filters = {
-contrast: document.getElementById('contrast'),
-brightness: document.getElementById('brightness'),
-saturate: document.getElementById('saturate'),
-hue: document.getElementById('hue'),
-sepia: document.getElementById('sepia'),
-blur: document.getElementById('blur'),
-vignette: document.getElementById('vignette'),
-sharpen: document.getElementById('sharpen'),
-gamma: document.getElementById('gamma'),
-invert: document.getElementById('invert'),
-grayscale: document.getElementById('grayscale')
+    contrast: document.getElementById('contrast'),
+    brightness: document.getElementById('brightness'),
+    saturate: document.getElementById('saturate'),
+    hue: document.getElementById('hue'),
+    sepia: document.getElementById('sepia'),
+    blur: document.getElementById('blur'),
+    vignette: document.getElementById('vignette'),
+    sharpen: document.getElementById('sharpen'),
+    gamma: document.getElementById('gamma'),
+    invert: document.getElementById('invert'),
+    grayscale: document.getElementById('grayscale')
 };
 const defaultValues = {contrast:100,brightness:100,saturate:100,hue:0,sepia:0,blur:0,vignette:0,sharpen:0,gamma:1,invert:0,grayscale:0};
+const defaultTransform = { rotate: 0, scaleX: 1, scaleY: 1 };
+const defaultCrop = { x: 0, y: 0, w: 100, h: 100, isApplied: false };
 
-const upload=document.getElementById('upload');
-const container=document.getElementById('container');
-const originalImg=document.getElementById('originalImg');
-const filteredImg=document.getElementById('filteredImg');
-const filteredContainer=document.getElementById('filteredContainer');
-const handle=document.getElementById('handle');
-const lens=document.getElementById('lens');
-const lensImg=document.getElementById('lensImg');
-const modeBtn=document.getElementById('modeBtn');
+// DOM (Genel)
+const appBody = document.getElementById('appBody');
+const upload = document.getElementById('upload');
+const container = document.getElementById('container');
+const originalImg = document.getElementById('originalImg');
+const filteredImg = document.getElementById('filteredImg');
+const filteredContainer = document.getElementById('filteredContainer');
+const vignetteOverlay = document.getElementById('vignetteOverlay');
+const handle = document.getElementById('handle');
+const lens = document.getElementById('lens');
+const lensImg = document.getElementById('lensImg');
+const modeBtn = document.getElementById('modeBtn');
+const rotateLeftBtn = document.getElementById('rotateLeft');
+const rotateRightBtn = document.getElementById('rotateRight');
+const flipXBtn = document.getElementById('flipX');
+const flipYBtn = document.getElementById('flipY');
 
-let lensMode=false;
+// DOM (History)
+const undoBtn = document.getElementById('undo');
+const redoBtn = document.getElementById('redo');
 
-function applyFilters(){
-    let filterStr = 
-    `contrast(${filters.contrast.value}%) 
-     brightness(${filters.brightness.value}%) 
-     saturate(${filters.saturate.value}%) 
-     hue-rotate(${filters.hue.value}deg) 
-     sepia(${filters.sepia.value}%) 
-     blur(${filters.blur.value}px) 
-     invert(${filters.invert.value}%) 
-     grayscale(${filters.grayscale.value}%)`;
-     
+// DOM (Kırpma)
+const cropBtn = document.getElementById('cropBtn');
+const cropControls = document.querySelector('.crop-controls');
+const confirmCropBtn = document.getElementById('confirmCrop');
+const cancelCropBtn = document.getElementById('cancelCrop');
+const cropContainer = document.getElementById('cropContainer');
+const cropBox = document.getElementById('cropBox');
+
+// Global Durum (State) Değişkenleri
+let lensMode = false;
+let isDragging = false; // Bu, genel bir "sürükleme" bayrağı olacak
+let isCropping = false; /* YENİ: Hata düzeltmesi için eklendi */
+let historyStack = [];
+let historyIndex = -1;
+let transformState = { ...defaultTransform };
+let cropState = { ...defaultCrop };
+
+// Kırpma arayüzü için geçici değişkenler
+let cropDragMode = null;
+let cropStartX, cropStartY;
+let originalCropBox = {};
+
+// == 2. Durum Yönetimi Fonksiyonları ==
+
+function getCurrentState() {
+    const state = {
+        filters: {},
+        transform: { ...transformState },
+        crop: { ...cropState }
+    };
+    for (const key in filters) {
+        state.filters[key] = filters[key].value;
+    }
+    return state;
+}
+
+function applyState(state) {
+    if (!state) return;
+
+    for (const key in state.filters) {
+        filters[key].value = state.filters[key];
+    }
+    applyFilters(); 
+
+    transformState = { ...state.transform };
+    applyTransforms();
+
+    cropState = { ...state.crop };
+    applyCropToImages(cropState);
+}
+
+function saveState() {
+    if (historyIndex < historyStack.length - 1) {
+        historyStack = historyStack.slice(0, historyIndex + 1);
+    }
+    const newState = getCurrentState();
+    
+    if (historyIndex > -1 && JSON.stringify(newState) === JSON.stringify(historyStack[historyIndex])) {
+        return; 
+    }
+
+    historyStack.push(newState);
+    historyIndex++;
+    updateHistoryButtons();
+}
+
+function updateHistoryButtons() {
+    undoBtn.disabled = (historyIndex <= 0);
+    redoBtn.disabled = (historyIndex >= historyStack.length - 1);
+}
+
+function undo() {
+    if (historyIndex > 0) {
+        historyIndex--;
+        applyState(historyStack[historyIndex]);
+        updateHistoryButtons();
+    }
+}
+function redo() {
+    if (historyIndex < historyStack.length - 1) {
+        historyIndex++;
+        applyState(historyStack[historyIndex]);
+        updateHistoryButtons();
+    }
+}
+
+// == 3. Ana Fonksiyonlar ==
+
+function applyFilters() {
+    let filterStr =
+        `contrast(${filters.contrast.value}%) brightness(${filters.brightness.value}%) ` +
+        `saturate(${filters.saturate.value}%) hue-rotate(${filters.hue.value}deg) ` +
+        `sepia(${filters.sepia.value}%) blur(${filters.blur.value}px) ` +
+        `invert(${filters.invert.value}%) grayscale(${filters.grayscale.value}%)`;
     filteredImg.style.filter = filterStr;
     lensImg.style.filter = filterStr;
+    const vignetteValue = filters.vignette.value;
+    const spread = (vignetteValue / 100) * 150;
+    const opacity = vignetteValue / 100;
+    if (vignetteOverlay) {
+        vignetteOverlay.style.boxShadow = `inset 0 0 ${spread}px ${spread / 2}px rgba(0,0,0,${opacity})`;
+    }
 }
 
-Object.values(filters).forEach(f=>f.addEventListener('input',applyFilters));
-
-let isDragging=false;
-function moveHandle(clientX){
-    const rect=container.getBoundingClientRect();
-    const offsetX=Math.min(Math.max(clientX-rect.left,0),rect.width);
-    handle.style.left=`${offsetX}px`;
-    filteredContainer.style.width=`${offsetX}px`;
-}
-handle.addEventListener('mousedown',()=>isDragging=true);
-document.addEventListener('mouseup',()=>isDragging=false);
-document.addEventListener('mousemove',e=>{if(isDragging) moveHandle(e.clientX);});
-handle.addEventListener('touchstart',e=>{isDragging=true;e.preventDefault();});
-window.addEventListener('touchend',()=>isDragging=false);
-window.addEventListener('touchmove',e=>{if(isDragging) moveHandle(e.touches[0].clientX);});
-
-function updateLensSize(){
-    lensImg.style.width=originalImg.offsetWidth+'px';
-    lensImg.style.height=originalImg.offsetHeight+'px';
-}
-
-upload.addEventListener('change',e=>{
-    const file=e.target.files[0];
-    if(!file) return;
-    const url=URL.createObjectURL(file);
-    originalImg.src=url;
-    filteredImg.src=url;
-    lensImg.src=url;
-    originalImg.onload=()=>{
-        filteredImg.style.width=originalImg.offsetWidth+'px';
-        filteredImg.style.height=originalImg.offsetHeight+'px';
-        updateLensSize();
-        applyFilters();
-        handle.style.left='50%';
-        filteredContainer.style.width='50%';
-    };
-});
-
-document.getElementById('reset').addEventListener('click',()=>{
-    Object.keys(filters).forEach(k=>filters[k].value=defaultValues[k]);
-    applyFilters();
-    handle.style.left='50%';
-    filteredContainer.style.width='50%';
+function applyTransforms() {
+    const transformStr = `
+        rotate(${transformState.rotate}deg) 
+        scaleX(${transformState.scaleX}) 
+        scaleY(${transformState.scaleY})
+    `;
+    originalImg.style.transform = transformStr;
+    filteredImg.style.transform = transformStr;
+    lensImg.style.transform = transformStr;
     updateLensSize();
+}
+
+function applyCropToImages(cropData) {
+    if (cropData.isApplied) {
+        const top = cropData.y;
+        const left = cropData.x;
+        const bottom = 100 - (cropData.y + cropData.h);
+        const right = 100 - (cropData.x + cropData.w);
+        const clipPathValue = `inset(${top}% ${right}% ${bottom}% ${left}%)`;
+
+        // DÜZELTME: Kırpmayı resme değil, taşıyıcıya uygula
+        if (filteredContainer) {
+            filteredContainer.style.clipPath = clipPathValue;
+        }
+        originalImg.style.clipPath = clipPathValue;
+        lensImg.style.clipPath = clipPathValue;
+    } else {
+        if (filteredContainer) {
+            filteredContainer.style.clipPath = 'none';
+        }
+        originalImg.style.clipPath = 'none';
+        lensImg.style.clipPath = 'none';
+    }
+}
+
+function handleFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    const url = URL.createObjectURL(file);
+    originalImg.src = url;
+    filteredImg.src = url;
+    lensImg.src = url;
+
+    originalImg.onload = () => {
+        filteredImg.style.width = originalImg.offsetWidth + 'px';
+        filteredImg.style.height = originalImg.offsetHeight + 'px';
+        updateLensSize();
+        
+        resetAll(); 
+        
+        historyStack = [];
+        historyIndex = -1;
+        saveState(); 
+        updateHistoryButtons();
+    };
+}
+
+function resetAll() {
+    Object.keys(filters).forEach(k => filters[k].value = defaultValues[k]);
+    applyFilters();
+    
+    transformState = { ...defaultTransform };
+    applyTransforms();
+    
+    cropState = { ...defaultCrop };
+    applyCropToImages(cropState);
+    
+    // DÜZELTME: Modu her zaman çubuk moduna sıfırla
+    lensMode = false;
+    lens.style.display = 'none';
+    handle.style.display = 'block';
+    filteredContainer.style.opacity = '1';
+    filteredContainer.style.width = '50%';
+    handle.style.left = '50%';
+    modeBtn.textContent = 'Lens Modu';
+}
+
+function moveHandle(clientX){
+    const rect = container.getBoundingClientRect();
+    const offsetX = Math.min(Math.max(clientX - rect.left, 0), rect.width);
+    handle.style.left = `${offsetX}px`;
+    filteredContainer.style.width = `${offsetX}px`;
+}
+function updateLensSize(){
+    lensImg.style.width = originalImg.offsetWidth + 'px';
+    lensImg.style.height = originalImg.offsetHeight + 'px';
+}
+
+// DÜZELTME: Bu, object-fit'i hesaba katan doğru moveLens fonksiyonudur.
+function moveLens(clientX,clientY){
+    const rect = container.getBoundingClientRect();
+    const lensSize = lens.offsetWidth;
+
+    const imgRenderedWidth = originalImg.offsetWidth;
+    const imgRenderedHeight = originalImg.offsetHeight;
+    const imgOffsetX = (rect.width - imgRenderedWidth) / 2;
+    const imgOffsetY = (rect.height - imgRenderedHeight) / 2;
+    
+    let mouseXOnImg = clientX - rect.left - imgOffsetX;
+    let mouseYOnImg = clientY - rect.top - imgOffsetY;
+
+    let x = mouseXOnImg - (lensSize / 2);
+    let y = mouseYOnImg - (lensSize / 2);
+
+    x = Math.max(0, Math.min(x, imgRenderedWidth - lensSize));
+    y = Math.max(0, Math.min(y, imgRenderedHeight - lensSize));
+
+    lens.style.left = `${x + imgOffsetX}px`;
+    lens.style.top = `${y + imgOffsetY}px`;
+
+    lensImg.style.left = `${-x}px`;
+    lensImg.style.top = `${-y}px`;
+
+    lensImg.style.width = imgRenderedWidth + 'px';
+    lensImg.style.height = imgRenderedHeight + 'px';
+}
+
+
+// == 4. Kırpma Modu Fonksiyonları ==
+
+function startCropping() {
+    isCropping = true;
+    appBody.classList.add('cropping');
+    cropContainer.style.display = 'block';
+    cropContainer.style.pointerEvents = 'auto'; // YENİ: Tıklanabilir yap
+
+    const containerRect = container.getBoundingClientRect();
+    const imgWidth = originalImg.offsetWidth;
+    const imgHeight = originalImg.offsetHeight;
+    const imgLeft = (containerRect.width - imgWidth) / 2;
+    const imgTop = (containerRect.height - imgHeight) / 2;
+
+    const x = imgLeft + (cropState.x / 100) * imgWidth;
+    const y = imgTop + (cropState.y / 100) * imgHeight;
+    const width = (cropState.w / 100) * imgWidth;
+    const height = (cropState.h / 100) * imgHeight;
+
+    cropBox.style.left = `${x}px`;
+    cropBox.style.top = `${y}px`;
+    cropBox.style.width = `${width}px`;
+    cropBox.style.height = `${height}px`;
+}
+
+function cancelCropping() {
+    isCropping = false;
+    appBody.classList.remove('cropping');
+    cropContainer.style.display = 'none';
+    cropContainer.style.pointerEvents = 'none'; // YENİ: Tekrar tıklanamaz yap
+}
+
+function confirmCropping() {
+    isCropping = false;
+    appBody.classList.remove('cropping');
+    cropContainer.style.display = 'none';
+    cropContainer.style.pointerEvents = 'none'; // YENİ: Tekrar tıklanamaz yap
+    
+    const containerRect = container.getBoundingClientRect();
+    const boxRect = cropBox.getBoundingClientRect();
+    
+    const imgWidth = originalImg.offsetWidth;
+    const imgHeight = originalImg.offsetHeight;
+    const imgLeft = (containerRect.width - imgWidth) / 2 + containerRect.left;
+    const imgTop = (containerRect.height - imgHeight) / 2 + containerRect.top;
+
+    let newX = ((boxRect.left - imgLeft) / imgWidth) * 100;
+    let newY = ((boxRect.top - imgTop) / imgHeight) * 100;
+    let newW = (boxRect.width / imgWidth) * 100;
+    let newH = (boxRect.height / imgHeight) * 100;
+
+    newX = Math.max(0, newX);
+    newY = Math.max(0, newY);
+    if (newX + newW > 100) newW = 100 - newX;
+    if (newY + newH > 100) newH = 100 - newY;
+
+    cropState = {
+        x: newX,
+        y: newY,
+        w: newW,
+        h: newH,
+        isApplied: true
+    };
+
+    applyCropToImages(cropState);
+    saveState();
+}
+
+// Kırpma Kutusu Sürükleme Fonksiyonları
+function handleCropDrag(e) {
+    if (!cropDragMode) return;
+    
+    e.preventDefault();
+    const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+    const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+
+    const dx = clientX - cropStartX;
+    const dy = clientY - cropStartY;
+
+    const containerRect = container.getBoundingClientRect();
+    const imgWidth = originalImg.offsetWidth;
+    const imgHeight = originalImg.offsetHeight;
+    const minLeft = (containerRect.width - imgWidth) / 2;
+    const minTop = (containerRect.height - imgHeight) / 2;
+    const maxLeft = minLeft + imgWidth;
+    const maxTop = minTop + imgHeight;
+
+    let { left, top, width, height } = originalCropBox;
+
+    if (cropDragMode === 'move') {
+        left += dx;
+        top += dy;
+    } else {
+        if (cropDragMode.includes('n')) { height -= dy; top += dy; }
+        if (cropDragMode.includes('s')) { height += dy; }
+        if (cropDragMode.includes('w')) { width -= dx; left += dx; }
+        if (cropDragMode.includes('e')) { width += dx; }
+    }
+    
+    if (width < 20) width = 20;
+    if (height < 20) height = 20;
+
+    if (left < minLeft) left = minLeft;
+    if (top < minTop) top = minTop;
+    if (left + width > maxLeft) {
+        width = maxLeft - left;
+        if(cropDragMode.includes('w')) left = maxLeft - width;
+    }
+    if (top + height > maxTop) {
+        height = maxTop - top;
+        if(cropDragMode.includes('n')) top = maxTop - height;
+    }
+    
+    cropBox.style.left = `${left}px`;
+    cropBox.style.top = `${top}px`;
+    cropBox.style.width = `${width}px`;
+    cropBox.style.height = `${height}px`;
+}
+
+function startCropDrag(e) {
+    if (!isCropping) return;
+    e.preventDefault(); 
+    
+    const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+    const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+
+    cropStartX = clientX;
+    cropStartY = clientY;
+    
+    const target = e.target;
+    if (target.classList.contains('crop-handle')) {
+        cropDragMode = target.className.split(' ')[1].replace('handle-', '');
+    } else if (target === cropBox) {
+        cropDragMode = 'move';
+    }
+
+    originalCropBox = {
+        left: cropBox.offsetLeft,
+        top: cropBox.offsetTop,
+        width: cropBox.offsetWidth,
+        height: cropBox.offsetHeight
+    };
+    
+    document.addEventListener('mousemove', handleCropDrag);
+    document.addEventListener('mouseup', endCropDrag);
+    document.addEventListener('touchmove', handleCropDrag, { passive: false });
+    document.addEventListener('touchend', endCropDrag);
+}
+
+function endCropDrag() {
+    cropDragMode = null;
+    document.removeEventListener('mousemove', handleCropDrag);
+    document.removeEventListener('mouseup', endCropDrag);
+    document.removeEventListener('touchmove', handleCropDrag);
+    document.removeEventListener('touchend', endCropDrag);
+}
+
+
+// == 5. Olay Dinleyicileri (Event Listeners) ==
+
+// History Butonları
+undoBtn.addEventListener('click', undo);
+redoBtn.addEventListener('click', redo);
+
+// Filtre Kaydırıcıları
+Object.values(filters).forEach(f => {
+    f.addEventListener('input', applyFilters);
+    f.addEventListener('change', saveState);
 });
 
-modeBtn.addEventListener('click',()=>{
-    lensMode=!lensMode;
-    if(lensMode){
-        lens.style.display='block';
-        handle.style.display='none';
-        filteredContainer.style.opacity='0';
-        modeBtn.textContent='Çubuk Modu';
+// Resim Yükleme
+upload.addEventListener('change', e => { handleFile(e.target.files[0]); });
+container.addEventListener('dragover', e => { e.preventDefault(); container.classList.add('dragover'); });
+container.addEventListener('dragleave', e => { e.preventDefault(); container.classList.remove('dragover'); });
+container.addEventListener('drop', e => {
+    e.preventDefault();
+    container.classList.remove('dragover');
+    handleFile(e.dataTransfer.files[0]);
+});
+
+// "Sıfırla" Butonu
+document.getElementById('reset').addEventListener('click', () => {
+    resetAll();
+    saveState();
+});
+
+// "Lens Modu" Butonu
+modeBtn.addEventListener('click', () => {
+    lensMode = !lensMode;
+    if (lensMode) {
+        lens.style.display = 'block';
+        handle.style.display = 'none';
+        filteredContainer.style.opacity = '0';
+        modeBtn.textContent = 'Çubuk Modu';
         updateLensSize();
+        // Lensin ortada başlaması için
+        const rect = container.getBoundingClientRect();
+        moveLens(rect.left + (rect.width / 2), rect.top + (rect.height / 2));
     } else {
-        lens.style.display='none';
-        handle.style.display='block';
-        filteredContainer.style.opacity='1';
-        filteredContainer.style.width='50%';
-        modeBtn.textContent='Lens Modu';
+        lens.style.display = 'none';
+        handle.style.display = 'block';
+        filteredContainer.style.opacity = '1';
+        filteredContainer.style.width = '50%';
+        handle.style.left = '50%';
+        modeBtn.textContent = 'Lens Modu';
     }
 });
 
-function moveLens(clientX,clientY){
-    const rect=container.getBoundingClientRect();
-    const lensSize=lens.offsetWidth;
-    let x=clientX-rect.left-lensSize/2;
-    let y=clientY-rect.top-lensSize/2;
-    x=Math.max(0,Math.min(x,rect.width-lensSize));
-    y=Math.max(0,Math.min(y,rect.height-lensSize));
-    lens.style.left=`${x}px`;
-    lens.style.top=`${y}px`;
-    lensImg.style.left=`${-x}px`;
-    lensImg.style.top=`${-y}px`;
-    lensImg.style.width=originalImg.offsetWidth+'px';
-    lensImg.style.height=originalImg.offsetHeight+'px';
-}
+// Lens Hareketi
+container.addEventListener('mousemove', e => { if (lensMode) moveLens(e.clientX, e.clientY); });
+container.addEventListener('touchmove', e => { if (lensMode && e.touches.length > 0) { e.preventDefault(); moveLens(e.touches[0].clientX, e.touches[0].clientY); }});
 
-container.addEventListener('mousemove',e=>{if(lensMode) moveLens(e.clientX,e.clientY);});
-container.addEventListener('touchmove',e=>{if(lensMode&&e.touches.length>0){e.preventDefault(); moveLens(e.touches[0].clientX,e.touches[0].clientY);}});
-
-document.querySelectorAll('.presets button').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-        switch(btn.dataset.preset){
-            case 'normal': Object.keys(filters).forEach(k=>filters[k].value=defaultValues[k]); break;
-            case 'bw': filters.grayscale.value=100; filters.sepia.value=0; break;
-            case 'sepia': filters.sepia.value=100; filters.grayscale.value=0; break;
-            case 'highcontrast': filters.contrast.value=150; break;
-            case 'vivid': filters.saturate.value=150; filters.brightness.value=120; break;
+// Presetler
+document.querySelectorAll('.presets button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        switch (btn.dataset.preset) {
+            case 'normal': Object.keys(filters).forEach(k => filters[k].value = defaultValues[k]); break;
+            case 'bw': filters.grayscale.value = 100; filters.sepia.value = 0; break;
+            case 'sepia': filters.sepia.value = 100; filters.grayscale.value = 0; break;
+            case 'highcontrast': filters.contrast.value = 150; break;
+            case 'vivid': filters.saturate.value = 150; filters.brightness.value = 120; break;
         }
         applyFilters();
+        saveState();
     });
 });
 
-document.getElementById('save').addEventListener('click',()=>{
-    if(!originalImg.src||originalImg.src.includes('dummyimage')) return;
-    const canvas=document.createElement('canvas');
-    const ctx=canvas.getContext('2d');
-    canvas.width=originalImg.naturalWidth;
-    canvas.height=originalImg.naturalHeight;
+// Dönüşüm Butonları
+rotateRightBtn.addEventListener('click', () => {
+    transformState.rotate = (transformState.rotate + 90) % 360;
+    applyTransforms();
+    saveState();
+});
+rotateLeftBtn.addEventListener('click', () => {
+    transformState.rotate = (transformState.rotate - 90 + 360) % 360;
+    applyTransforms();
+    saveState();
+});
+flipXBtn.addEventListener('click', () => {
+    transformState.scaleX *= -1;
+    applyTransforms();
+    saveState();
+});
+flipYBtn.addEventListener('click', () => {
+    transformState.scaleY *= -1;
+    applyTransforms();
+    saveState();
+});
+
+// Kırpma Butonları
+cropBtn.addEventListener('click', startCropping);
+cancelCropBtn.addEventListener('click', cancelCropping);
+confirmCropBtn.addEventListener('click', confirmCropping);
+cropContainer.addEventListener('mousedown', startCropDrag);
+cropContainer.addEventListener('touchstart', startCropDrag, { passive: false });
+
+/* DÜZELTME: Çubuk (handle) sürüklemesi için yeni, güvenli yöntem */
+function handleDragMove(e) {
+    if (isDragging) {
+        e.preventDefault(); // Metin seçmeyi/resim sürüklemeyi engelle
+        const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+        moveHandle(clientX);
+    }
+}
+function handleDragEnd() {
+    isDragging = false;
+    document.removeEventListener('mousemove', handleDragMove);
+    document.removeEventListener('mouseup', handleDragEnd);
+    document.removeEventListener('touchmove', handleDragMove);
+    document.removeEventListener('touchend', handleDragEnd);
+}
+function handleDragStart(e) {
+    // Sadece çubuk modundaysak sürüklemeyi başlat
+    if (lensMode || isCropping) return;
     
-    ctx.filter = 
-    `contrast(${filters.contrast.value}%) 
-     brightness(${filters.brightness.value}%) 
-     saturate(${filters.saturate.value}%) 
-     hue-rotate(${filters.hue.value}deg) 
-     sepia(${filters.sepia.value}%) 
-     blur(${filters.blur.value}px) 
-     invert(${filters.invert.value}%) 
-     grayscale(${filters.grayscale.value}%)`;
-     
-    ctx.drawImage(originalImg,0,0,canvas.width,canvas.height);
+    isDragging = true;
+    e.preventDefault(); // Metin seçmeyi/resim sürüklemeyi engelle
+    document.addEventListener('mousemove', handleDragMove);
+    document.addEventListener('mouseup', handleDragEnd);
+    document.addEventListener('touchmove', handleDragMove, { passive: false });
+    document.addEventListener('touchend', handleDragEnd);
+}
+
+handle.addEventListener('mousedown', handleDragStart);
+handle.addEventListener('touchstart', handleDragStart, { passive: false });
+/* /DÜZELTME */
+
+
+// "Kaydet" Butonu
+document.getElementById('save').addEventListener('click', () => {
+    if (!originalImg.src || originalImg.src.includes('dummyimage')) return;
+
+    const currentState = getCurrentState();
+    const w = originalImg.naturalWidth;
+    const h = originalImg.naturalHeight;
+
+    const crop = currentState.crop;
+    const sx = crop.isApplied ? (w * (crop.x / 100)) : 0;
+    const sy = crop.isApplied ? (h * (crop.y / 100)) : 0;
+    const sWidth = crop.isApplied ? (w * (crop.w / 100)) : w;
+    const sHeight = crop.isApplied ? (h * (crop.h / 100)) : h;
     
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    const isSwapped = (currentState.transform.rotate % 180 !== 0);
+    canvas.width = isSwapped ? sHeight : sWidth;
+    canvas.height = isSwapped ? sWidth : sHeight;
+
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(currentState.transform.rotate * Math.PI / 180);
+    ctx.scale(currentState.transform.scaleX, currentState.transform.scaleY);
+
+    const f = currentState.filters;
+    ctx.filter =
+        `contrast(${f.contrast}%) brightness(${f.brightness}%) ` +
+        `saturate(${f.saturate}%) hue-rotate(${f.hue}deg) ` +
+        `sepia(${f.sepia}%) blur(${f.blur}px) ` +
+        `invert(${f.invert}%) grayscale(${f.grayscale}%)`;
+
+    ctx.drawImage(originalImg, 
+        sx, sy, sWidth, sHeight,
+        -sWidth / 2, -sHeight / 2, sWidth, sHeight
+    );
+    
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
     // Gamma
-    if(filters.gamma.value!=1){
-        const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
-        const data=imgData.data;
-        const gamma=1/filters.gamma.value;
-        for(let i=0;i<data.length;i+=4){
-            data[i]=255*Math.pow(data[i]/255,gamma);
-            data[i+1]=255*Math.pow(data[i+1]/255,gamma);
-            data[i+2]=255*Math.pow(data[i+2]/255,gamma);
+    if (f.gamma != 1) {
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imgData.data;
+        const gamma = 1 / f.gamma;
+        for (let i = 0; i < data.length; i += 4) {
+            data[i] = 255 * Math.pow(data[i] / 255, gamma);
+            data[i + 1] = 255 * Math.pow(data[i + 1] / 255, gamma);
+            data[i + 2] = 255 * Math.pow(data[i + 2] / 255, gamma);
         }
-        ctx.putImageData(imgData,0,0);
+        ctx.putImageData(imgData, 0, 0);
     }
     
     // Vignette
-    if(filters.vignette.value>0){
-        const grad=ctx.createRadialGradient(canvas.width/2,canvas.height/2,0,canvas.width/2,canvas.height/2,Math.max(canvas.width,canvas.height)/1.2);
-        grad.addColorStop(0,'rgba(0,0,0,0)');
-        grad.addColorStop(1,`rgba(0,0,0,${filters.vignette.value/100})`);
-        ctx.fillStyle=grad;
-        ctx.fillRect(0,0,canvas.width,canvas.height);
+    if (f.vignette > 0) {
+        const grad = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) / 1.2);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, `rgba(0,0,0,${f.vignette / 100})`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // Sharpen (basit kernel)
-    if(filters.sharpen.value>0){
-        const imgData=ctx.getImageData(0,0,canvas.width,canvas.height);
-        const data=imgData.data;
-        const factor=filters.sharpen.value;
-        for(let i=4;i<data.length-4;i+=4){
-            data[i]=Math.min(255,Math.max(0,data[i]+factor*(data[i]-data[i-4])));
-            data[i+1]=Math.min(255,Math.max(0,data[i+1]+factor*(data[i+1]-data[i-3])));
-            data[i+2]=Math.min(255,Math.max(0,data[i+2]+factor*(data[i+2]-data[i-2])));
+    // Sharpen
+    if (f.sharpen > 0) {
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imgData.data;
+        const factor = f.sharpen;
+        for (let i = 4; i < data.length - 4; i += 4) {
+            // Basit bir keskinleştirme algoritması, daha karmaşıkları da var
+            // Bu, komşu piksellere göre farkı abartır
+            // Daha sağlam bir kernel (convolution matrix) kullanılabilir ancak bu canlı önizlemesi zor
+            // Bu basit yöntem bile canvas'ta çalışır
+            data[i] = Math.min(255, Math.max(0, data[i] + factor * (data[i] - (i > 4 ? data[i - 4] : data[i]))));
+            data[i+1] = Math.min(255, Math.max(0, data[i+1] + factor * (data[i+1] - (i > 4 ? data[i - 3] : data[i+1]))));
+            data[i+2] = Math.min(255, Math.max(0, data[i+2] + factor * (data[i+2] - (i > 4 ? data[i - 2] : data[i+2]))));
         }
-        ctx.putImageData(imgData,0,0);
+        ctx.putImageData(imgData, 0, 0);
     }
     
-    const dataURL=canvas.toDataURL("image/jpeg",0.9);
-    const a=document.createElement('a');
-    a.href=dataURL;
-    a.download='duzenlenmis_resim.jpg';
+    const dataURL = canvas.toDataURL("image/jpeg", 0.9);
+    const a = document.createElement('a');
+    a.href = dataURL;
+    a.download = 'duzenlenmis_resim.jpg';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
 });
 
-applyFilters();
+// == 6. Başlangıç ==
+resetAll();
+saveState();
 </script>
 </body>
 </html>
