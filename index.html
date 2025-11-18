@@ -3,28 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pro Fotoğraf Düzenleyici</title>
+<title>Ultra Fotoğraf Düzenleyici</title>
 <style>
 /* --- TEMEL STİLLER --- */
 :root {
-    --bg-color: #f6f6f6;
-    --panel-bg: #fff;
+    --bg-color: #f0f2f5;
+    --panel-bg: #ffffff;
     --text-color: #333;
-    --primary: #29a1f1;
-    --primary-hover: #1972ac;
-    --border-color: #ccc;
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
+    --accent: #ec4899;
+    --border-color: #e5e7eb;
 }
 body.dark-mode {
-    --bg-color: #1a1a1a;
-    --panel-bg: #2d2d2d;
-    --text-color: #eee;
-    --primary: #4db3ff;
-    --primary-hover: #29a1f1;
-    --border-color: #444;
+    --bg-color: #111827;
+    --panel-bg: #1f2937;
+    --text-color: #f3f4f6;
+    --primary: #6366f1;
+    --primary-hover: #818cf8;
+    --border-color: #374151;
 }
 
-body { font-family: 'Segoe UI', Arial, sans-serif; background:var(--bg-color); color:var(--text-color); text-align:center; margin:0; transition: background 0.3s, color 0.3s; }
-h2 { margin-top: 15px; }
+body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background:var(--bg-color); color:var(--text-color); text-align:center; margin:0; transition: background 0.3s, color 0.3s; }
+h2 { margin-top: 15px; font-weight: 800; letter-spacing: -0.5px; }
 
 /* --- ANA KONTEYNER --- */
 #container { 
@@ -32,302 +33,282 @@ h2 { margin-top: 15px; }
     display: inline-block; 
     margin:20px 0; 
     background:var(--panel-bg); 
-    box-shadow:0 0 20px rgba(0,0,0,0.1); 
+    box-shadow:0 10px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); 
     max-width:95vw; 
-    /* Çerçeve için border-box önemli */
     box-sizing: border-box;
     border: 0px solid transparent; 
     transition: border 0.2s;
-    overflow: hidden; /* Dışarı taşmaları engelle */
+    overflow: hidden; 
+    border-radius: 8px;
+    touch-action: none;
+    user-select: none;
 }
-#container.dragover { border: 3px dashed var(--primary); background: rgba(41, 161, 241, 0.1); }
+#container.dragover { border: 3px dashed var(--primary); background: rgba(79, 70, 229, 0.1); }
 
-/* Orijinal resim akışta durur, boyutunu korur */
+/* Orijinal resim (Alt katman) */
 #container > img#originalImg { 
-    display: block; 
-    width:100%; 
-    height:100%; 
-    object-fit:contain; 
-    user-select: none; 
+    display: block; width:100%; height:100%; object-fit:contain; pointer-events: none; 
 }
 
-/* --- KATMANLAR VE EFEKTLER --- */
-/* Filtered Container: Sadece görünür alanı sınırlar (genişliği slider ile değişir) */
+/* --- KATMANLAR --- */
+/* Filtreli Alan */
 #filteredContainer { 
-    position:absolute; 
-    top:0; 
-    left:0; 
-    height:100%; 
-    width: 50%; /* Başlangıç değeri */
-    overflow:hidden; 
-    pointer-events:none; 
-    z-index: 10; 
+    position:absolute; top:0; left:0; height:100%; width: 50%; 
+    overflow:hidden; pointer-events:none; z-index: 10; 
     border-right: 1px solid rgba(255,255,255,0.5);
+    background: var(--panel-bg); 
+    transition: width 0.1s ease-out;
 }
+body.lens-active #filteredContainer { width: 100% !important; border-right: none !important; }
+body.lens-active #handle { display: none !important; }
 
-/* ÖNEMLİ DÜZELTME: Filtreli resim container daralsa bile tam boyutta kalmalı */
-#filteredImg { 
-    position:absolute; 
-    top:0; 
-    left:0; 
-    /* width ve height JS ile container boyutuna eşitlenecek */
-    object-fit:contain; 
-}
+#filteredImg { position:absolute; top:0; left:0; object-fit:contain; }
 
-#vignetteOverlay, #tintOverlay { 
+#vignetteOverlay, #tintOverlay, #noiseOverlay { 
     position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
     pointer-events: none; z-index: 12; 
 }
 #vignetteOverlay { transition: box-shadow 0.1s linear; }
 #tintOverlay { mix-blend-mode: overlay; z-index: 13; }
+#noiseOverlay { z-index: 14; opacity: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E"); }
 
-/* --- COMPARE SLIDER (Kulp) --- */
+/* Çizim Canvası */
+#drawingCanvas {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 18; pointer-events: none;
+}
+
+/* --- SLIDER HANDLE --- */
 #handle { 
-    position:absolute; top:0; left: 50%; width:4px; height:100%; 
-    background:#fff; box-shadow: 0 0 5px rgba(0,0,0,0.5); 
-    cursor:ew-resize; z-index:20; transition:background .2s; 
-    transform: translateX(-50%); /* Tam ortalamak için */
+    position:absolute; top:0; left: 50%; width:40px; height:100%; 
+    margin-left: -20px; 
+    background: transparent; 
+    cursor:ew-resize; z-index:20; 
+    display: flex; justify-content: center; 
+}
+#handle::before {
+    content: ''; display: block; width: 4px; height: 100%; background: #fff;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
 }
 #handle::after { 
-    content:''; position:absolute; top:50%; left:50%; width:30px; height:30px; 
+    content:'↔'; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px;
+    position:absolute; top:50%; left:50%; width:32px; height:32px; 
     background:var(--primary); border-radius:50%; 
     transform:translate(-50%, -50%); 
-    z-index:-1; box-shadow: 0 2px 5px rgba(0,0,0,0.3); 
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white' width='18px' height='18px'%3E%3Cpath d='M0 0h24v24H0z' fill='none'/%3E%3Cpath d='M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z'/%3E%3Cpath d='M14 6l1.41 1.41L10.83 12l4.58 4.59L14 18l-6-6z' transform='rotate(180 12 12)'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: center;
+    z-index:21; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
 }
-#handle:hover { background:#eee; }
+#handle:hover::before { background: #eee; }
+#handle:hover::after { background:var(--accent); }
 
 /* --- LENS MODU --- */
 #lens { 
-    position:absolute; border:2px solid var(--primary); border-radius:50%; 
-    width:150px; height:150px; overflow:hidden; display:none; 
-    z-index:21; pointer-events:none; background:rgba(255,255,255,0.05); 
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3); 
+    position:absolute; 
+    border: 3px solid var(--primary); 
+    border-radius:50%; 
+    width:160px; height:160px; 
+    overflow:hidden; display:none; 
+    z-index: 50; 
+    pointer-events: none; 
+    background:rgba(255,255,255,0.1); 
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5), inset 0 0 20px rgba(0,0,0,0.2); 
+    /* DÜZELTME: Boyut hesabını sabitlemek için */
+    box-sizing: border-box;
 }
 #lensImg { position:absolute; object-fit:contain; }
+#lensOverlayContainer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
 
-/* --- UI ELEMANLARI --- */
-#controls { margin:15px auto; display:flex; flex-wrap:wrap; justify-content:center; gap:10px; max-width: 800px; }
-button, input[type=file], select { padding:8px 16px; border:none; border-radius:6px; cursor:pointer; font-size:0.95em; outline:none; }
-button { background:var(--primary); color:#fff; transition:all .2s; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-button:hover { background:var(--primary-hover); transform: translateY(-1px); }
-button:active { transform: translateY(1px); }
-button:disabled { background: #aaa; cursor: not-allowed; transform: none; }
+/* --- UI --- */
+#controls { margin:20px auto; display:flex; flex-wrap:wrap; justify-content:center; gap:12px; max-width: 900px; }
+button, input[type=file], select { padding:10px 18px; border:none; border-radius:8px; cursor:pointer; font-size:0.9rem; outline:none; font-weight: 600; }
+button { background:var(--primary); color:#fff; transition:all .2s; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+button:hover { background:var(--primary-hover); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+button.secondary { background: #6b7280; }
+button.secondary:hover { background: #4b5563; }
+button.danger { background: #ef4444; }
+button.danger:hover { background: #dc2626; }
+button.active { background: var(--accent); } 
 
-/* --- SEKME SİSTEMİ --- */
-.tab-container { max-width: 800px; margin: 0 auto 20px auto; background: var(--panel-bg); border-radius: 8px; padding: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-.tabs { display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 15px; overflow-x: auto; }
-.tab-btn { background: transparent; color: var(--text-color); border-radius: 0; padding: 10px 20px; box-shadow: none; opacity: 0.7; font-weight: bold; }
-.tab-btn:hover { background: rgba(0,0,0,0.05); opacity: 1; transform: none; }
-.tab-btn.active { border-bottom: 3px solid var(--primary); color: var(--primary); opacity: 1; }
+.tab-container { max-width: 900px; margin: 0 auto 25px auto; background: var(--panel-bg); border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+.tabs { display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 20px; overflow-x: auto; gap: 5px; padding-bottom: 5px; }
+.tab-btn { background: transparent; color: var(--text-color); border-radius: 8px 8px 0 0; padding: 12px 24px; box-shadow: none; opacity: 0.6; font-weight: 600; border-bottom: 3px solid transparent; }
+.tab-btn:hover { background: rgba(0,0,0,0.03); opacity: 0.9; transform: none; }
+.tab-btn.active { border-bottom: 3px solid var(--primary); color: var(--primary); opacity: 1; background: rgba(79, 70, 229, 0.05); }
 .tab-content { display: none; animation: fadeIn 0.3s; }
 .tab-content.active { display: block; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-/* --- KONTROL GRUPLARI --- */
 .control-panel { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; align-items: center; }
-.history-controls, .transform-controls, .crop-controls { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
-.crop-controls { display: none; }
-.crop-controls button.confirm { background: #28a745; }
-.crop-controls button.cancel { background: #dc3545; }
+.filter-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:20px; padding: 10px; }
+.filter-item { display:flex; flex-direction:column; align-items:center; background: var(--bg-color); padding: 15px; border-radius: 10px; transition: transform 0.2s; }
+.filter-item:hover { transform: scale(1.02); }
+label { margin-bottom:8px; font-size: 0.85em; font-weight:700; color: var(--text-color); letter-spacing: 0.5px; }
+input[type=range] { width:100%; accent-color: var(--primary); cursor: pointer; height: 6px; border-radius: 5px; }
 
-.filter-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:15px; padding: 10px; }
-.filter-item { display:flex; flex-direction:column; align-items:center; background: rgba(0,0,0,0.03); padding: 10px; border-radius: 8px; }
-label { margin-bottom:5px; font-size: 0.85em; font-weight:600; color: var(--text-color); }
-input[type=range] { width:100%; accent-color: var(--primary); cursor: pointer; }
+#overlayLayer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 15; overflow: hidden; pointer-events: none; }
+.draggable-item { position: absolute; cursor: grab; user-select: none; pointer-events: auto; border: 1px dashed transparent; transition: border 0.2s; }
+.draggable-item:hover, .draggable-item.active { border: 1px dashed #fff; background: rgba(0,0,0,0.2); box-shadow: 0 0 10px rgba(0,0,0,0.3); }
+.draggable-item img { max-width: 150px; pointer-events: none; }
 
-/* --- PRESETS --- */
-.presets { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom: 10px; }
-.presets button { background: #555; font-size: 0.85em; padding: 6px 12px; }
-.presets button:hover { background: #333; }
-
-/* --- METİN VE ÇIKARTMA KATMANLARI --- */
-#overlayLayer {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 15; overflow: hidden; pointer-events: none;
-}
-.draggable-item {
-    position: absolute; cursor: grab; user-select: none; pointer-events: auto;
-    border: 1px dashed transparent; transition: border 0.2s;
-}
-.draggable-item:hover, .draggable-item.active { border: 1px dashed #fff; background: rgba(0,0,0,0.2); }
-.draggable-item:active { cursor: grabbing; }
-.draggable-text { font-weight: bold; white-space: nowrap; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); padding: 5px; }
-.draggable-sticker { font-size: 40px; line-height: 1; padding: 5px; }
-.remove-btn {
-    position: absolute; top: -10px; right: -10px; width: 20px; height: 20px;
-    background: red; color: white; border-radius: 50%; text-align: center;
-    line-height: 18px; font-size: 12px; cursor: pointer; display: none;
-}
-.draggable-item:hover .remove-btn, .draggable-item.active .remove-btn { display: block; }
-
-/* --- KROPLAMA ALANI --- */
 #cropContainer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 30; display: none; touch-action: none; }
-#cropBox { position: absolute; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6); border: 1px dashed #fff; cursor: move; }
-.crop-handle { position: absolute; width: 12px; height: 12px; background: var(--primary); border: 2px solid #fff; border-radius: 50%; }
-.handle-nw { top: -6px; left: -6px; cursor: nwse-resize; }
-.handle-ne { top: -6px; right: -6px; cursor: nesw-resize; }
-.handle-sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
-.handle-se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+#cropBox { position: absolute; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7); border: 1px solid rgba(255,255,255,0.8); cursor: move; }
+.crop-handle { position: absolute; width: 14px; height: 14px; background: var(--primary); border: 2px solid #fff; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+.handle-nw { top: -7px; left: -7px; cursor: nwse-resize; }
+.handle-ne { top: -7px; right: -7px; cursor: nesw-resize; }
+.handle-sw { bottom: -7px; left: -7px; cursor: nesw-resize; }
+.handle-se { bottom: -7px; right: -7px; cursor: nwse-resize; }
 
-/* --- HEADER & DARK MODE --- */
-.header-bar { display: flex; justify-content: space-between; align-items: center; padding: 0 20px; max-width: 800px; margin: 0 auto; }
-.theme-toggle { background: transparent; color: var(--text-color); font-size: 1.2em; padding: 5px; box-shadow: none; }
-.theme-toggle:hover { background: rgba(0,0,0,0.1); }
+.header-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; max-width: 900px; margin: 0 auto; }
+.theme-toggle { background: transparent; color: var(--text-color); font-size: 1.5em; padding: 5px; box-shadow: none; }
+input[type=color] { -webkit-appearance: none; border: none; width: 35px; height: 35px; padding: 0; border-radius: 50%; cursor: pointer; }
+input[type=color]::-webkit-color-swatch { border: 2px solid rgba(0,0,0,0.1); border-radius: 50%; }
 
-/* RENK SEÇİCİLER */
-input[type=color] { -webkit-appearance: none; border: none; width: 30px; height: 30px; padding: 0; overflow: hidden; border-radius: 50%; cursor: pointer; vertical-align: middle; }
-input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
-input[type=color]::-webkit-color-swatch { border: none; }
+body.drawing-mode #container { cursor: crosshair; }
+body.drawing-mode #handle { pointer-events: none; opacity: 0.5; }
+body.lens-active #container { cursor: none; }
 
+.svg-filters { position: absolute; width: 0; height: 0; overflow: hidden; }
 @media(max-width:700px){ .filter-grid { grid-template-columns: 1fr 1fr; } .tabs { font-size: 0.8em; } }
 </style>
 </head>
 <body id="appBody">
 
+<svg class="svg-filters">
+  <filter id="duotoneFilter">
+    <feColorMatrix type="matrix" values=".33 .33 .33 0 0 .33 .33 .33 0 0 .33 .33 .33 0 0 0 0 0 1 0" result="grayscale" />
+    <feComponentTransfer color-interpolation-filters="sRGB" result="duotone">
+        <feFuncR type="table" tableValues="0 1" id="duotoneR"/>
+        <feFuncG type="table" tableValues="0 1" id="duotoneG"/>
+        <feFuncB type="table" tableValues="0 1" id="duotoneB"/>
+        <feFuncA type="table" tableValues="0 1"/>
+    </feComponentTransfer>
+  </filter>
+</svg>
+
 <div class="header-bar">
-    <h2>Pro Fotoğraf Düzenleyici</h2>
-    <button id="themeBtn" class="theme-toggle" title="Temayı Değiştir">🌓</button>
+    <h2>✨ Ultra Fotoğraf Editörü</h2>
+    <button id="themeBtn" class="theme-toggle" title="Karanlık Mod">🌓</button>
 </div>
 
 <div id="controls">
-    <input type="file" id="upload" accept="image/*">
-    <button id="save" title="Resmi indir">💾 Kaydet</button>
-    <button id="reset" title="Her şeyi sıfırla">🔄 Sıfırla</button>
+    <input type="file" id="upload" accept="image/*" style="background:var(--panel-bg); color:var(--text-color);">
+    <button id="save">💾 İndir (HD)</button>
+    <button id="reset" class="secondary">🔄 Sıfırla</button>
 </div>
 
-<!-- SEKME YAPISI -->
 <div class="tab-container">
     <div class="tabs">
-        <button class="tab-btn active" onclick="openTab('tab-filters')">Filtreler</button>
-        <button class="tab-btn" onclick="openTab('tab-adjust')">Ayarlar & Kırp</button>
-        <button class="tab-btn" onclick="openTab('tab-text')">Metin & Çıkartma</button>
-        <button class="tab-btn" onclick="openTab('tab-frame')">Çerçeve & Efekt</button>
+        <button class="tab-btn active" onclick="openTab('tab-filters')">🎛️ Filtreler</button>
+        <button class="tab-btn" onclick="openTab('tab-draw')">🎨 Çizim</button>
+        <button class="tab-btn" onclick="openTab('tab-objects')">🖼️ Katmanlar</button>
+        <button class="tab-btn" onclick="openTab('tab-adjust')">✂️ Araçlar</button>
     </div>
 
-    <!-- TAB 1: FİLTRELER -->
     <div id="tab-filters" class="tab-content active">
-        <div class="presets">
-            <button data-preset="normal">Normal</button>
-            <button data-preset="bw">Siyah Beyaz</button>
-            <button data-preset="sepia">Sepya</button>
-            <button data-preset="highcontrast">Yüksek Kontrast</button>
-            <button data-preset="vivid">Canlı</button>
-            <button data-preset="vintage">Vintage</button>
-            <button data-preset="kodak">Analog</button>
-            <button data-preset="techno">Tekno</button>
-        </div>
         <div class="filter-grid">
-            <div class="filter-item"><label>Kontrast</label><input type="range" id="contrast" min="0" max="200" value="100"></div>
-            <div class="filter-item"><label>Parlaklık</label><input type="range" id="brightness" min="0" max="200" value="100"></div>
-            <div class="filter-item"><label>Doygunluk</label><input type="range"id="saturate" min="0" max="200" value="100"></div>
-            <div class="filter-item"><label>Renk Tonu</label><input type="range" id="hue" min="0" max="360" value="0"></div>
-            <div class="filter-item"><label>Sepya</label><input type="range" id="sepia" min="0" max="100" value="0"></div>
-            <div class="filter-item"><label>Bulanıklık</label><input type="range" id="blur" min="0" max="10" value="0" step="0.2"></div>
-            <div class="filter-item"><label>Keskinlik</label><input type="range" id="sharpen" min="0" max="5" value="0" step="0.1"></div>
+             <div class="filter-item"><label>Kontrast</label><input type="range" id="contrast" min="0" max="200" value="100"></div>
+             <div class="filter-item"><label>Parlaklık</label><input type="range" id="brightness" min="0" max="200" value="100"></div>
+             <div class="filter-item"><label>Doygunluk</label><input type="range"id="saturate" min="0" max="200" value="100"></div>
+             <div class="filter-item"><label>Bulanıklık</label><input type="range" id="blur" min="0" max="10" value="0" step="0.2"></div>
+             <div class="filter-item"><label>Pikselleştir</label><input type="range" id="pixelate" min="1" max="20" value="1" step="1" title="Sansür efekti"></div>
+             <div class="filter-item"><label>Gürültü (Grain)</label><input type="range" id="noise" min="0" max="100" value="0"></div>
+             <div class="filter-item" style="grid-column: span 2; align-items: flex-start;">
+                <label style="width:100%; display:flex; justify-content:space-between;"><span>Duotone Efekti</span><input type="checkbox" id="duotoneToggle"></label>
+                <div style="display:flex; gap:10px; width:100%; margin-top:5px;">
+                    <input type="color" id="duotoneC1" value="#2e1065" title="Koyu Renk">
+                    <input type="color" id="duotoneC2" value="#f472b6" title="Açık Renk">
+                </div>
+             </div>
         </div>
     </div>
 
-    <!-- TAB 2: AYARLAR & KIRPMA -->
+    <div id="tab-draw" class="tab-content">
+        <div class="control-panel">
+            <button id="drawToggle" class="secondary">✏️ Çizimi Başlat</button>
+            <input type="color" id="brushColor" value="#ff0000">
+            <input type="range" id="brushSize" min="1" max="50" value="5" style="width:100px" title="Fırça Boyutu">
+            <button id="eraserBtn" class="secondary" title="Silgi Modu">🧽</button>
+            <button id="clearDrawBtn" class="danger">🗑️ Temizle</button>
+        </div>
+        <p style="text-align:center; font-size:0.85em; color:#666; margin-top:10px;">Not: Çizim modundayken karşılaştırma çubuğu devre dışı kalır.</p>
+    </div>
+
+    <div id="tab-objects" class="tab-content">
+        <div class="control-panel" style="align-items: flex-end;">
+            <div style="display:flex; flex-direction:column; gap:5px;">
+                <label>Metin Ekle</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="textInput" placeholder="Yazı..." style="border:1px solid #ccc; width:100px; padding:5px;">
+                    <input type="color" id="textColor" value="#ffffff">
+                    <button id="addTextBtn">Ekle</button>
+                </div>
+            </div>
+            <div style="width:1px; height:40px; background:#ddd; margin:0 10px;"></div>
+            <div style="display:flex; flex-direction:column; gap:5px;">
+                <label>Logo/Resim Ekle</label>
+                <button onclick="document.getElementById('addImgInput').click()">📂 Resim Seç</button>
+                <input type="file" id="addImgInput" accept="image/*" style="display:none">
+            </div>
+        </div>
+        <hr style="border:0; border-top:1px solid var(--border-color); margin:15px 0;">
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+            <button class="secondary" onclick="addSticker('😎')" style="font-size:1.2em; padding:5px 10px;">😎</button>
+            <button class="secondary" onclick="addSticker('🔥')" style="font-size:1.2em; padding:5px 10px;">🔥</button>
+            <button class="secondary" onclick="addSticker('❤️')" style="font-size:1.2em; padding:5px 10px;">❤️</button>
+            <button class="secondary" onclick="addSticker('✨')" style="font-size:1.2em; padding:5px 10px;">✨</button>
+            <button class="secondary" onclick="addSticker('📍')" style="font-size:1.2em; padding:5px 10px;">📍</button>
+        </div>
+    </div>
+
     <div id="tab-adjust" class="tab-content">
         <div class="control-panel">
             <button id="modeBtn">🔍 Lens Modu</button>
-            <button id="cropBtn">✂️ Kırpma Modu</button>
+            <button id="cropBtn">✂️ Kırp</button>
         </div>
-        
-        <div class="crop-controls">
-            <button id="confirmCrop" class="confirm">✅ Onayla</button>
-            <button id="cancelCrop" class="cancel">❌ İptal</button>
+        <div class="crop-controls" style="display:none; margin-top:10px; justify-content:center; gap:10px;">
+            <button id="confirmCrop" style="background:#10b981;">✅ Onayla</button>
+            <button id="cancelCrop" style="background:#ef4444;">❌ İptal</button>
         </div>
-
-        <div class="history-controls">
-            <button id="undo" disabled>↩️ Geri Al</button>
-            <button id="redo" disabled>↪️ İleri Al</button>
+        <div class="transform-controls" style="margin-top:15px;">
+            <button id="rotateLeft">↺</button>
+            <button id="rotateRight">↻</button>
+            <button id="flipX">↔</button>
+            <button id="flipY">↕</button>
         </div>
-
-        <div class="transform-controls">
-            <button id="rotateLeft" title="Sola Döndür">↺ 90°</button>
-            <button id="rotateRight" title="Sağa Döndür">↻ 90°</button>
-            <button id="flipX" title="Yatay Çevir">↔ Yatay</button>
-            <button id="flipY" title="Dikey Çevir">↕ Dikey</button>
-        </div>
-        <div class="filter-grid" style="margin-top:10px;">
-             <div class="filter-item"><label>Gamma</label><input type="range" id="gamma" min="0.1" max="3" value="1" step="0.1"></div>
-             <div class="filter-item"><label>Ters Çevir</label><input type="range" id="invert" min="0" max="100" value="0"></div>
-             <div class="filter-item"><label>Gri Tonlama</label><input type="range" id="grayscale" min="0" max="100" value="0"></div>
-        </div>
-    </div>
-
-    <!-- TAB 3: METİN & ÇIKARTMA -->
-    <div id="tab-text" class="tab-content">
-        <div class="control-panel">
-            <div class="filter-item" style="flex-direction:row; gap:10px;">
-                <input type="text" id="textInput" placeholder="Metin yazın..." style="border:1px solid #ccc; width:120px;">
-                <input type="color" id="textColor" value="#ffffff" title="Yazı Rengi">
-                <input type="range" id="textSize" min="10" max="100" value="30" style="width:80px" title="Yazı Boyutu">
-                <button id="addTextBtn">➕ Yazı Ekle</button>
-            </div>
-        </div>
-        <hr style="border:0; border-top:1px solid var(--border-color); margin:10px 0;">
-        <div class="presets">
-            <button onclick="addSticker('😎')">😎</button>
-            <button onclick="addSticker('🔥')">🔥</button>
-            <button onclick="addSticker('❤️')">❤️</button>
-            <button onclick="addSticker('⭐')">⭐</button>
-            <button onclick="addSticker('🎉')">🎉</button>
-            <button onclick="addSticker('💯')">💯</button>
-            <button onclick="addSticker('👑')">👑</button>
-            <button onclick="addSticker('📸')">📸</button>
-        </div>
-        <p style="font-size:0.8em; color:#888; margin-top:5px;">Ögeleri silmek için üzerine tıklayıp kırmızı çarpıya basın.</p>
-    </div>
-
-    <!-- TAB 4: ÇERÇEVE & EFEKT -->
-    <div id="tab-frame" class="tab-content">
+        <hr style="border:0; border-top:1px solid var(--border-color); margin:15px 0;">
         <div class="filter-grid">
-             <div class="filter-item"><label>Vignette (Köşe Karartma)</label><input type="range" id="vignette" min="0" max="100" value="0"></div>
-             <div class="filter-item">
-                 <label>Renk Kaplama</label>
-                 <div style="display:flex; gap:5px; align-items:center; width:100%">
-                     <input type="color" id="tintColor" value="#ff9900">
-                     <input type="range" id="tintOpacity" min="0" max="100" value="0">
-                 </div>
-             </div>
-             <div class="filter-item">
-                 <label>Çerçeve Kalınlığı</label>
-                 <input type="range" id="borderWidth" min="0" max="50" value="0">
-             </div>
-             <div class="filter-item">
-                 <label>Çerçeve Rengi</label>
-                 <input type="color" id="borderColor" value="#ffffff" style="width:50px; height:30px; border-radius:4px;">
-             </div>
+             <div class="filter-item"><label>Vignette</label><input type="range" id="vignette" min="0" max="100" value="0"></div>
+             <div class="filter-item"><label>Çerçeve</label><input type="range" id="borderWidth" min="0" max="50" value="0"></div>
+             <div class="filter-item"><label>Renk Kaplama</label><input type="range" id="tintOpacity" min="0" max="100" value="0"></div>
+             <div class="filter-item"><label>Çerç. Rengi</label><input type="color" id="borderColor" value="#ffffff"></div>
+             <div class="filter-item"><label>Kaplama Rengi</label><input type="color" id="tintColor" value="#ff9900"></div>
         </div>
     </div>
 </div>
 
-<!-- RESİM ALANI -->
 <div id="container" style="width:480px; height:300px;">
-    <img id="originalImg" src="https://dummyimage.com/800x500/cccccc/464646.png&text=Resim+Yükle">
+    <!-- Orijinal Resim -->
+    <img id="originalImg" src="https://dummyimage.com/800x500/e0e0e0/666666.png&text=Resim+Yükle">
     
-    <!-- Filtreli Katman -->
+    <!-- Filtreli Resim -->
     <div id="filteredContainer">
-        <!-- DÜZELTME: filteredImg burada JS ile container boyutuna eşitlenecek -->
-        <img id="filteredImg" src="https://dummyimage.com/800x500/cccccc/464646.png&text=Resim+Yükle">
+        <img id="filteredImg" src="https://dummyimage.com/800x500/e0e0e0/666666.png&text=Resim+Yükle">
         <div id="vignetteOverlay"></div>
         <div id="tintOverlay"></div> 
+        <div id="noiseOverlay"></div> 
     </div>
 
-    <!-- Sürükle Bırak Katmanı (Metin/Sticker) -->
+    <canvas id="drawingCanvas"></canvas>
     <div id="overlayLayer"></div>
-
-    <!-- Araçlar -->
+    
+    <!-- Handle -->
     <div id="handle"></div>
+    
+    <!-- Lens -->
     <div id="lens">
-        <img id="lensImg" src="https://dummyimage.com/800x500/cccccc/464646.png&text=Resim+Yükle">
+        <img id="lensImg" src="https://dummyimage.com/800x500/e0e0e0/666666.png&text=Resim+Yükle">
+        <div id="lensOverlayContainer"></div>
     </div>
     
-    <!-- Kırpma Arayüzü -->
     <div id="cropContainer">
         <div id="cropBox">
             <div class="crop-handle handle-nw"></div>
@@ -339,764 +320,242 @@ input[type=color]::-webkit-color-swatch { border: none; }
 </div>
 
 <script>
-// == 1. DOM Elemanları ==
-const filters = {
-    contrast: document.getElementById('contrast'),
-    brightness: document.getElementById('brightness'),
-    saturate: document.getElementById('saturate'),
-    hue: document.getElementById('hue'),
-    sepia: document.getElementById('sepia'),
-    blur: document.getElementById('blur'),
-    vignette: document.getElementById('vignette'),
-    sharpen: document.getElementById('sharpen'),
-    gamma: document.getElementById('gamma'),
-    invert: document.getElementById('invert'),
-    grayscale: document.getElementById('grayscale')
+// == DOM ELEMENTS ==
+const filters = { contrast: document.getElementById('contrast'), brightness: document.getElementById('brightness'), saturate: document.getElementById('saturate'), blur: document.getElementById('blur'), pixelate: document.getElementById('pixelate'), noise: document.getElementById('noise'), vignette: document.getElementById('vignette') };
+const duotoneElements = { toggle: document.getElementById('duotoneToggle'), c1: document.getElementById('duotoneC1'), c2: document.getElementById('duotoneC2'), r: document.getElementById('duotoneR'), g: document.getElementById('duotoneG'), b: document.getElementById('duotoneB') };
+const drawingCanvas = document.getElementById('drawingCanvas');
+const overlayElements = { addImg: document.getElementById('addImgInput'), tintColor: document.getElementById('tintColor'), tintOp: document.getElementById('tintOpacity'), borderW: document.getElementById('borderWidth'), borderC: document.getElementById('borderColor'), textIn: document.getElementById('textInput'), textCol: document.getElementById('textColor'), addText: document.getElementById('addTextBtn') };
+const core = { container: document.getElementById('container'), original: document.getElementById('originalImg'), filtered: document.getElementById('filteredImg'), fContainer: document.getElementById('filteredContainer'), handle: document.getElementById('handle'), lens: document.getElementById('lens'), lensImg: document.getElementById('lensImg'), lensOver: document.getElementById('lensOverlayContainer'), modeBtn: document.getElementById('modeBtn'), overlayLayer: document.getElementById('overlayLayer'), noise: document.getElementById('noiseOverlay') };
+
+// State
+let state = {
+    filters: { contrast: 100, brightness: 100, saturate: 100, blur: 0, pixelate: 1, noise: 0, vignette: 0 },
+    transform: { rotate: 0, scaleX: 1, scaleY: 1 },
+    crop: { x: 0, y: 0, w: 100, h: 100, isApplied: false },
+    border: { width: 0, color: '#ffffff' },
+    tint: { color: '#ff9900', opacity: 0 },
+    duotone: { active: false, c1: '#2e1065', c2: '#f472b6' }
 };
-const tintColorInput = document.getElementById('tintColor');
-const tintOpacityInput = document.getElementById('tintOpacity');
-const borderWidthInput = document.getElementById('borderWidth');
-const borderColorInput = document.getElementById('borderColor');
-const textInput = document.getElementById('textInput');
-const textColorInput = document.getElementById('textColor');
-const textSizeInput = document.getElementById('textSize');
-const addTextBtn = document.getElementById('addTextBtn');
-const themeBtn = document.getElementById('themeBtn');
 
-const defaultValues = {contrast:100,brightness:100,saturate:100,hue:0,sepia:0,blur:0,vignette:0,sharpen:0,gamma:1,invert:0,grayscale:0};
-const defaultTransform = { rotate: 0, scaleX: 1, scaleY: 1 };
-const defaultCrop = { x: 0, y: 0, w: 100, h: 100, isApplied: false };
+let lensMode = false; 
+let isDrawingMode = false;
+let isDrawing = false;
+let isEraser = false;
+let drawCtx = drawingCanvas.getContext('2d');
 
-// DOM (Genel)
-const appBody = document.getElementById('appBody');
-const upload = document.getElementById('upload');
-const container = document.getElementById('container');
-const originalImg = document.getElementById('originalImg');
-const filteredImg = document.getElementById('filteredImg');
-const filteredContainer = document.getElementById('filteredContainer');
-const vignetteOverlay = document.getElementById('vignetteOverlay');
-const tintOverlay = document.getElementById('tintOverlay');
-const overlayLayer = document.getElementById('overlayLayer');
-const handle = document.getElementById('handle');
-const lens = document.getElementById('lens');
-const lensImg = document.getElementById('lensImg');
-const modeBtn = document.getElementById('modeBtn');
+// == INIT & RESIZE ==
+function updateImageDimensions() {
+    const w = core.container.offsetWidth;
+    const h = core.container.offsetHeight;
+    core.filtered.style.width = w + 'px';
+    core.filtered.style.height = h + 'px';
+    if(core.lensImg) { core.lensImg.style.width = w + 'px'; core.lensImg.style.height = h + 'px'; }
+    if(drawingCanvas.width !== w || drawingCanvas.height !== h) {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = drawingCanvas.width; tempCanvas.height = drawingCanvas.height;
+        tempCanvas.getContext('2d').drawImage(drawingCanvas, 0, 0);
+        drawingCanvas.width = w; drawingCanvas.height = h;
+        drawCtx.drawImage(tempCanvas, 0, 0, w, h);
+        setupBrush();
+    }
+    core.lensOver.style.width = w + 'px'; core.lensOver.style.height = h + 'px';
+}
+window.addEventListener('resize', updateImageDimensions);
 
-// DOM (Kontroller)
-const rotateLeftBtn = document.getElementById('rotateLeft');
-const rotateRightBtn = document.getElementById('rotateRight');
-const flipXBtn = document.getElementById('flipX');
-const flipYBtn = document.getElementById('flipY');
-const undoBtn = document.getElementById('undo');
-const redoBtn = document.getElementById('redo');
-
-// DOM (Kırpma)
-const cropBtn = document.getElementById('cropBtn');
-const confirmCropBtn = document.getElementById('confirmCrop');
-const cancelCropBtn = document.getElementById('cancelCrop');
-const cropContainer = document.getElementById('cropContainer');
-const cropBox = document.getElementById('cropBox');
-
-// Global Durum
-let lensMode = false;
-let isDragging = false; 
-let isCropping = false;
-let historyStack = [];
-let historyIndex = -1;
-let transformState = { ...defaultTransform };
-let cropState = { ...defaultCrop };
-let borderState = { width: 0, color: '#ffffff' };
-let tintState = { color: '#ff9900', opacity: 0 };
-
-let cropDragMode = null;
-let cropStartX, cropStartY;
-let originalCropBox = {};
-
-// == SEKME SİSTEMİ ==
-function openTab(tabName) {
+function handleFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    const url = URL.createObjectURL(file);
+    core.original.src = url; core.filtered.src = url; core.lensImg.src = url;
+    core.original.onload = () => {
+        let w = core.original.naturalWidth; let h = core.original.naturalHeight;
+        const maxW = window.innerWidth * 0.9; const maxH = window.innerHeight * 0.6;
+        const ratio = w / h;
+        let newW = Math.min(w, maxW); let newH = newW / ratio;
+        if(newH > maxH) { newH = maxH; newW = newH * ratio; }
+        core.container.style.width = newW + 'px'; core.container.style.height = newH + 'px';
+        setTimeout(() => {
+             updateImageDimensions();
+             drawCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+             core.overlayLayer.innerHTML = ''; core.lensOver.innerHTML = ''; 
+             resetAll();
+        }, 50);
+    };
+}
+document.getElementById('upload').addEventListener('change', e => handleFile(e.target.files[0]));
+window.openTab = function(tabName) {
     document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(tb => tb.classList.remove('active'));
     document.getElementById(tabName).classList.add('active');
     event.currentTarget.classList.add('active');
 }
 
-// == TEMA ==
-themeBtn.addEventListener('click', () => {
-    document.body.classList.toggle('dark-mode');
-});
-
-// == 2. Boyutlandırma ve Görüntüleme Mantığı (DÜZELTME BURADA) ==
-function updateImageDimensions() {
-    // Konteyner boyutlarını al
-    const w = container.offsetWidth;
-    const h = container.offsetHeight;
-    
-    // filteredImg boyutlarını KESİNLİKLE konteyner boyutlarına sabitle (piksel olarak)
-    // Böylece filteredContainer daralsa bile resim daralmaz, sadece görünür alanı azalır.
-    filteredImg.style.width = w + 'px';
-    filteredImg.style.height = h + 'px';
-    
-    // Lens boyutları da aynı olmalı
-    if(lensImg) {
-        lensImg.style.width = w + 'px';
-        lensImg.style.height = h + 'px';
-    }
-}
-
-// Pencere boyutu değişirse resim boyutlarını tekrar hesapla
-window.addEventListener('resize', () => {
-    updateImageDimensions();
-});
-
-// == 3. Durum Yönetimi ==
-function getCurrentState() {
-    const state = {
-        filters: {},
-        transform: { ...transformState },
-        crop: { ...cropState },
-        border: { ...borderState },
-        tint: { ...tintState },
-    };
-    for (const key in filters) {
-        state.filters[key] = filters[key].value;
-    }
-    return state;
-}
-
-function applyState(state) {
-    if (!state) return;
-
-    for (const key in state.filters) {
-        filters[key].value = state.filters[key];
-    }
-    
-    if(state.border) {
-        borderState = state.border;
-        borderWidthInput.value = borderState.width;
-        borderColorInput.value = borderState.color;
-    }
-    if(state.tint) {
-        tintState = state.tint;
-        tintColorInput.value = tintState.color;
-        tintOpacityInput.value = tintState.opacity;
-    }
-
-    applyFilters(); 
-    transformState = { ...state.transform };
-    applyTransforms();
-    cropState = { ...state.crop };
-    applyCropToImages(cropState);
-}
-
-function saveState() {
-    if (historyIndex < historyStack.length - 1) {
-        historyStack = historyStack.slice(0, historyIndex + 1);
-    }
-    const newState = getCurrentState();
-    if (historyIndex > -1 && JSON.stringify(newState) === JSON.stringify(historyStack[historyIndex])) {
-        return; 
-    }
-    historyStack.push(newState);
-    historyIndex++;
-    updateHistoryButtons();
-}
-
-function updateHistoryButtons() {
-    undoBtn.disabled = (historyIndex <= 0);
-    redoBtn.disabled = (historyIndex >= historyStack.length - 1);
-}
-
-function undo() {
-    if (historyIndex > 0) {
-        historyIndex--;
-        applyState(historyStack[historyIndex]);
-        updateHistoryButtons();
-    }
-}
-function redo() {
-    if (historyIndex < historyStack.length - 1) {
-        historyIndex++;
-        applyState(historyStack[historyIndex]);
-        updateHistoryButtons();
-    }
-}
-
-// == 4. Ana Fonksiyonlar ==
-function applyFilters() {
-    let filterStr =
-        `contrast(${filters.contrast.value}%) brightness(${filters.brightness.value}%) ` +
-        `saturate(${filters.saturate.value}%) hue-rotate(${filters.hue.value}deg) ` +
-        `sepia(${filters.sepia.value}%) blur(${filters.blur.value}px) ` +
-        `invert(${filters.invert.value}%) grayscale(${filters.grayscale.value}%)`;
-    
-    filteredImg.style.filter = filterStr;
-    lensImg.style.filter = filterStr;
-    
-    const vignetteValue = filters.vignette.value;
-    const spread = (vignetteValue / 100) * 150;
-    const opacity = vignetteValue / 100;
-    if (vignetteOverlay) {
-        vignetteOverlay.style.boxShadow = `inset 0 0 ${spread}px ${spread / 2}px rgba(0,0,0,${opacity})`;
-    }
-
-    if(tintOverlay) {
-        tintOverlay.style.backgroundColor = tintState.color;
-        tintOverlay.style.opacity = tintState.opacity / 100;
-    }
-
-    container.style.border = `${borderState.width}px solid ${borderState.color}`;
-}
-
-function applyTransforms() {
-    const transformStr = `
-        rotate(${transformState.rotate}deg) 
-        scaleX(${transformState.scaleX}) 
-        scaleY(${transformState.scaleY})
-    `;
-    originalImg.style.transform = transformStr;
-    filteredImg.style.transform = transformStr;
-    lensImg.style.transform = transformStr;
-    overlayLayer.style.transform = transformStr;
-    updateLensSize(); // Lensi taşı
-}
-
-function applyCropToImages(cropData) {
-    if (cropData.isApplied) {
-        const top = cropData.y;
-        const left = cropData.x;
-        const bottom = 100 - (cropData.y + cropData.h);
-        const right = 100 - (cropData.x + cropData.w);
-        const clipPathValue = `inset(${top}% ${right}% ${bottom}% ${left}%)`;
-
-        // FilteredContainer'a clipPath uygulamıyoruz, çünkü o slider işlevi görüyor
-        // FilteredImg'e uyguluyoruz
-        filteredImg.style.clipPath = clipPathValue;
-        originalImg.style.clipPath = clipPathValue;
-        lensImg.style.clipPath = clipPathValue;
-        overlayLayer.style.clipPath = clipPathValue;
+// == LENS MODU ==
+core.modeBtn.addEventListener('click', () => {
+    lensMode = !lensMode;
+    document.body.classList.toggle('lens-active', lensMode);
+    if (lensMode) {
+        core.lens.style.display = 'block';
+        core.overlayLayer.style.clipPath = 'none';
+        drawingCanvas.style.clipPath = 'none';
+        core.modeBtn.textContent = '📏 Çubuk Modu';
+        core.modeBtn.classList.add('active');
+        updateImageDimensions();
+        const rect = core.container.getBoundingClientRect();
+        moveLens(rect.left + rect.width/2, rect.top + rect.height/2);
     } else {
-        filteredImg.style.clipPath = 'none';
-        originalImg.style.clipPath = 'none';
-        lensImg.style.clipPath = 'none';
-        overlayLayer.style.clipPath = 'none';
+        core.lens.style.display = 'none';
+        core.fContainer.style.width = '50%';
+        core.handle.style.left = '50%';
+        const rect = core.container.getBoundingClientRect();
+        const x = rect.width / 2;
+        core.overlayLayer.style.clipPath = `inset(0 ${rect.width - x}px 0 0)`;
+        drawingCanvas.style.clipPath = `inset(0 ${rect.width - x}px 0 0)`;
+        core.modeBtn.textContent = '🔍 Lens Modu';
+        core.modeBtn.classList.remove('active');
     }
+});
+
+function moveLens(clientX, clientY) {
+    const rect = core.container.getBoundingClientRect();
+    // border-box olduğu için offsetWidth tam kutu genişliğini verir (border dahil)
+    // Lensin merkezini bulmak için 2'ye böleriz.
+    const lensRadius = core.lens.offsetWidth / 2;
+    
+    let mouseX = clientX - rect.left;
+    let mouseY = clientY - rect.top;
+
+    let lensLeft = mouseX - lensRadius;
+    let lensTop = mouseY - lensRadius;
+    core.lens.style.left = lensLeft + 'px';
+    core.lens.style.top = lensTop + 'px';
+
+    // İçeriğin (0,0) noktası borderın içidir (content-box başlar).
+    // Ancak img absolute ve top/left 0 olduğu için padding box'a göre hizalanır.
+    // Border kalınlığını da (3px) hesaba katarak kaydırmalıyız.
+    // Lensin "görsel merkezi" mouse'un olduğu yerdir.
+    // Mouse, lensin dış sol kenarından "lensRadius" kadar içeridedir.
+    // İçerik alanı ise dış sol kenardan "borderWidth" kadar içeridedir.
+    // Yani içerik alanı içindeki görsel merkez: lensRadius - borderWidth
+    // (80px - 3px = 77px)
+    // Resim üzerindeki mouseX noktasının, içerik alanındaki 77. pikselde durması gerekir.
+    // L + mouseX = 77 => L = 77 - mouseX.
+    
+    // CSS'den border width alalım (dinamik)
+    const style = window.getComputedStyle(core.lens);
+    const borderLeft = parseFloat(style.borderLeftWidth) || 0;
+    const borderTop = parseFloat(style.borderTopWidth) || 0;
+    
+    const centerOffsetX = lensRadius - borderLeft;
+    const centerOffsetY = lensRadius - borderTop;
+
+    const innerLeft = centerOffsetX - mouseX;
+    const innerTop = centerOffsetY - mouseY;
+
+    core.lensImg.style.left = innerLeft + 'px';
+    core.lensImg.style.top = innerTop + 'px';
+    core.lensOver.style.left = innerLeft + 'px';
+    core.lensOver.style.top = innerTop + 'px';
 }
 
-function handleFile(file) {
-    if (!file || !file.type.startsWith('image/')) return;
-    const url = URL.createObjectURL(file);
-    originalImg.src = url;
-    filteredImg.src = url;
-    lensImg.src = url;
+core.container.addEventListener('mousemove', e => { if (lensMode) moveLens(e.clientX, e.clientY); });
+core.container.addEventListener('touchmove', e => { if (lensMode && e.touches.length > 0) { e.preventDefault(); moveLens(e.touches[0].clientX, e.touches[0].clientY); } }, { passive: false });
 
-    originalImg.onload = () => {
-        let w = originalImg.naturalWidth;
-        let h = originalImg.naturalHeight;
-        const maxW = window.innerWidth * 0.9;
-        const maxH = window.innerHeight * 0.6;
-        
-        container.style.width = Math.min(w, maxW) + 'px';
-        container.style.height = (Math.min(w, maxW) * (h/w)) + 'px';
-
-        // Boyutları hemen güncelle
-        setTimeout(() => {
-             updateImageDimensions();
-        }, 50);
-        
-        resetAll(); 
-        overlayLayer.innerHTML = '';
-        
-        historyStack = [];
-        historyIndex = -1;
-        saveState(); 
-        updateHistoryButtons();
-    };
+// == FİLTERS ==
+function applyFilters() {
+    let filterStr = `contrast(${state.filters.contrast}%) brightness(${state.filters.brightness}%) saturate(${state.filters.saturate}%) blur(${state.filters.blur}px) `;
+    if(state.duotone.active) { filterStr += `url(#duotoneFilter) `; updateDuotoneMatrix(); } else { filterStr += `grayscale(0%) `; }
+    core.filtered.style.filter = filterStr;
+    if(core.lensImg) core.lensImg.style.filter = filterStr; 
+    if(core.noise) core.noise.style.opacity = state.filters.noise / 200;
+    if(document.getElementById('vignetteOverlay')) { const val = state.filters.vignette; const spread = (val / 100) * 150; document.getElementById('vignetteOverlay').style.boxShadow = `inset 0 0 ${spread}px ${spread/2}px rgba(0,0,0,${val/100})`; }
+    if(document.getElementById('tintOverlay')) { document.getElementById('tintOverlay').style.backgroundColor = state.tint.color; document.getElementById('tintOverlay').style.opacity = state.tint.opacity / 100; }
+    core.container.style.border = `${state.border.width}px solid ${state.border.color}`;
 }
+function hexToRgb(hex) { const r = parseInt(hex.substr(1,2), 16)/255; const g = parseInt(hex.substr(3,2), 16)/255; const b = parseInt(hex.substr(5,2), 16)/255; return {r,g,b}; }
+function updateDuotoneMatrix() { const c1 = hexToRgb(state.duotone.c1); const c2 = hexToRgb(state.duotone.c2); duotoneElements.r.setAttribute('tableValues', `${c1.r} ${c2.r}`); duotoneElements.g.setAttribute('tableValues', `${c1.g} ${c2.g}`); duotoneElements.b.setAttribute('tableValues', `${c1.b} ${c2.b}`); }
+Object.keys(state.filters).forEach(k => { if(filters[k]) filters[k].addEventListener('input', e => { state.filters[k] = parseFloat(e.target.value); applyFilters(); }); });
+duotoneElements.toggle.addEventListener('change', e => { state.duotone.active = e.target.checked; applyFilters(); });
+overlayElements.tintOp.addEventListener('input', e => { state.tint.opacity = e.target.value; applyFilters(); });
+overlayElements.borderW.addEventListener('input', e => { state.border.width = e.target.value; applyFilters(); });
+
+// == DRAWING ==
+function setupBrush() { drawCtx.lineCap = 'round'; drawCtx.lineJoin = 'round'; updateBrush(); }
+function updateBrush() { drawCtx.lineWidth = document.getElementById('brushSize').value; drawCtx.strokeStyle = isEraser ? 'rgba(0,0,0,1)' : document.getElementById('brushColor').value; drawCtx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over'; }
+document.getElementById('drawToggle').addEventListener('click', () => { isDrawingMode = !isDrawingMode; document.body.classList.toggle('drawing-mode', isDrawingMode); drawingCanvas.style.pointerEvents = isDrawingMode ? 'auto' : 'none'; document.getElementById('drawToggle').textContent = isDrawingMode ? '🛑 Çizimi Durdur' : '✏️ Çizimi Başlat'; document.getElementById('drawToggle').style.background = isDrawingMode ? '#ef4444' : '#6b7280'; });
+document.getElementById('brushColor').addEventListener('input', () => { isEraser = false; updateBrush(); });
+document.getElementById('eraserBtn').addEventListener('click', () => { isEraser = !isEraser; updateBrush(); });
+document.getElementById('clearDrawBtn').addEventListener('click', () => drawCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height));
+drawingCanvas.addEventListener('mousedown', e => { if(!isDrawingMode) return; isDrawing = true; drawCtx.beginPath(); drawCtx.moveTo(e.offsetX, e.offsetY); });
+drawingCanvas.addEventListener('mousemove', e => { if(!isDrawing || !isDrawingMode) return; drawCtx.lineTo(e.offsetX, e.offsetY); drawCtx.stroke(); });
+drawingCanvas.addEventListener('mouseup', () => { if(isDrawing) { drawCtx.closePath(); isDrawing = false; } });
+drawingCanvas.addEventListener('touchstart', e => { if(!isDrawingMode) return; e.preventDefault(); isDrawing=true; const rect=drawingCanvas.getBoundingClientRect(); drawCtx.beginPath(); drawCtx.moveTo(e.touches[0].clientX-rect.left, e.touches[0].clientY-rect.top); }, {passive:false});
+drawingCanvas.addEventListener('touchmove', e => { if(!isDrawing || !isDrawingMode) return; e.preventDefault(); const rect=drawingCanvas.getBoundingClientRect(); drawCtx.lineTo(e.touches[0].clientX-rect.left, e.touches[0].clientY-rect.top); drawCtx.stroke(); }, {passive:false});
+
+// == OVERLAYS ==
+function makeDraggable(el) {
+    let isDragging = false, startX, startY, initialLeft, initialTop;
+    const mouseDown = e => { if(e.target.className.includes('remove-btn')) return; isDragging = true; const evt = e.type === 'touchstart' ? e.touches[0] : e; startX = evt.clientX; startY = evt.clientY; initialLeft = el.offsetLeft; initialTop = el.offsetTop; document.addEventListener('mousemove', mouseMove); document.addEventListener('mouseup', mouseUp); document.addEventListener('touchmove', mouseMove, {passive:false}); document.addEventListener('touchend', mouseUp); };
+    const mouseMove = e => { if (!isDragging) return; e.preventDefault(); const evt = e.type === 'touchmove' ? e.touches[0] : e; const dx = evt.clientX - startX; const dy = evt.clientY - startY; const nl = initialLeft + dx; const nt = initialTop + dy; el.style.left = nl+'px'; el.style.top = nt+'px'; if(el._clone) { el._clone.style.left = nl+'px'; el._clone.style.top = nt+'px'; } };
+    const mouseUp = () => { isDragging = false; document.removeEventListener('mousemove', mouseMove); document.removeEventListener('mouseup', mouseUp); document.removeEventListener('touchmove', mouseMove); document.removeEventListener('touchend', mouseUp); };
+    el.addEventListener('mousedown', mouseDown); el.addEventListener('touchstart', mouseDown, {passive:false});
+}
+function createOverlayItem(contentNode) {
+    const div = document.createElement('div'); div.className = 'draggable-item'; div.style.left = '50%'; div.style.top = '50%'; div.style.transform = 'translate(-50%, -50%)';
+    const rm = document.createElement('div'); rm.className = 'remove-btn'; rm.innerHTML = '×'; rm.style.cssText = 'position:absolute; top:-10px; right:-10px; width:20px; height:20px; background:red; color:white; border-radius:50%; text-align:center; cursor:pointer; line-height:18px; font-weight:bold; display:none;';
+    rm.onclick = () => { if(div._clone) div._clone.remove(); div.remove(); };
+    div.appendChild(contentNode.cloneNode(true)); div.appendChild(rm);
+    div.addEventListener('mouseenter', () => rm.style.display = 'block'); div.addEventListener('mouseleave', () => rm.style.display = 'none');
+    core.overlayLayer.appendChild(div);
+    const cloneDiv = document.createElement('div'); cloneDiv.className = 'draggable-item'; cloneDiv.style.left = '50%'; cloneDiv.style.top = '50%'; cloneDiv.style.transform = 'translate(-50%, -50%)'; cloneDiv.style.pointerEvents = 'none'; 
+    cloneDiv.appendChild(contentNode.cloneNode(true)); core.lensOver.appendChild(cloneDiv); div._clone = cloneDiv; makeDraggable(div);
+}
+overlayElements.addText.addEventListener('click', () => { if(!overlayElements.textIn.value) return; const s = document.createElement('span'); s.textContent = overlayElements.textIn.value; s.style.color = overlayElements.textCol.value; s.style.fontSize = '24px'; s.style.fontWeight = 'bold'; s.className = 'draggable-text'; createOverlayItem(s); overlayElements.textIn.value = ''; });
+window.addSticker = e => { const s = document.createElement('span'); s.textContent = e; s.style.fontSize = '40px'; s.className = 'draggable-sticker'; createOverlayItem(s); };
+
+// == TRANSFORMS & CROP ==
+function applyTransforms() { const t = `rotate(${state.transform.rotate}deg) scale(${state.transform.scaleX}, ${state.transform.scaleY})`; core.original.style.transform = t; core.filtered.style.transform = t; core.lensImg.style.transform = t; }
+document.getElementById('rotateRight').onclick = () => { state.transform.rotate += 90; applyTransforms(); };
+let draggingHandle = false;
+function moveHandle(e) { if(!draggingHandle || isDrawingMode) return; let clientX = e.touches ? e.touches[0].clientX : e.clientX; const rect = core.container.getBoundingClientRect(); let x = Math.max(0, Math.min(clientX - rect.left, rect.width)); core.handle.style.left = x+'px'; core.fContainer.style.width = x+'px'; const insetRight = rect.width - x; core.overlayLayer.style.clipPath = `inset(0 ${insetRight}px 0 0)`; drawingCanvas.style.clipPath = `inset(0 ${insetRight}px 0 0)`; }
+core.handle.addEventListener('mousedown', () => draggingHandle=true); core.handle.addEventListener('touchstart', () => draggingHandle=true, {passive:false});
+window.addEventListener('mouseup', () => draggingHandle=false); window.addEventListener('touchend', () => draggingHandle=false);
+window.addEventListener('mousemove', moveHandle); window.addEventListener('touchmove', moveHandle, {passive:false});
+
+// == SAVE ==
+document.getElementById('save').addEventListener('click', () => {
+    const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+    const w = core.container.offsetWidth; const h = core.container.offsetHeight; canvas.width = w; canvas.height = h;
+    ctx.save(); ctx.translate(w/2, h/2); ctx.rotate(state.transform.rotate * Math.PI/180); ctx.scale(state.transform.scaleX, state.transform.scaleY); ctx.drawImage(core.original, -w/2, -h/2, w, h); ctx.restore();
+    const fCanvas = document.createElement('canvas'); fCanvas.width = w; fCanvas.height = h; const fCtx = fCanvas.getContext('2d');
+    fCtx.filter = core.filtered.style.filter; fCtx.drawImage(canvas, 0, 0);
+    if(state.duotone.active) {
+        const id = fCtx.getImageData(0,0,w,h); const d = id.data; const c1 = hexToRgb(state.duotone.c1); const c2 = hexToRgb(state.duotone.c2);
+        for(let i=0; i<d.length; i+=4) { const gray = (d[i]*0.3 + d[i+1]*0.59 + d[i+2]*0.11)/255; d[i]=(c1.r+(c2.r-c1.r)*gray)*255; d[i+1]=(c1.g+(c2.g-c1.g)*gray)*255; d[i+2]=(c1.b+(c2.b-c1.b)*gray)*255; }
+        fCtx.putImageData(id, 0, 0);
+    }
+    ctx.drawImage(fCanvas, 0, 0); ctx.drawImage(drawingCanvas, 0, 0);
+    document.querySelectorAll('.draggable-item').forEach(item => {
+        if(item.parentElement === core.lensOver) return;
+        const rect = item.getBoundingClientRect(); const cRect = core.container.getBoundingClientRect();
+        const x = rect.left - cRect.left; const y = rect.top - cRect.top;
+        const img = item.querySelector('img'); const txt = item.querySelector('.draggable-text'); const stkr = item.querySelector('.draggable-sticker');
+        ctx.save(); if(img) ctx.drawImage(img, x, y, img.width, img.height); else if(txt||stkr) { ctx.font = txt?"bold 24px Arial":"40px Arial"; ctx.fillStyle = txt?txt.style.color:"black"; ctx.textBaseline='top'; ctx.fillText(item.innerText.replace('×',''), x, y); } ctx.restore();
+    });
+    if(state.border.width > 0) { ctx.strokeStyle = state.border.color; ctx.lineWidth = state.border.width * 2; ctx.strokeRect(0,0,w,h); }
+    if(state.tint.opacity > 0) { ctx.globalCompositeOperation = 'overlay'; ctx.fillStyle = state.tint.color; ctx.globalAlpha = state.tint.opacity/100; ctx.fillRect(0,0,w,h); }
+    const a = document.createElement('a'); a.href = canvas.toDataURL('image/jpeg', 0.9); a.download = 'edit.jpg'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+});
 
 function resetAll() {
-    Object.keys(filters).forEach(k => filters[k].value = defaultValues[k]);
-    transformState = { ...defaultTransform };
-    cropState = { ...defaultCrop };
-    borderState = { width: 0, color: '#ffffff' };
-    tintState = { color: '#ff9900', opacity: 0 };
-    
-    borderWidthInput.value = 0;
-    tintOpacityInput.value = 0;
-    
-    applyFilters();
-    applyTransforms();
-    applyCropToImages(cropState);
-    
-    lensMode = false;
-    lens.style.display = 'none';
-    handle.style.display = 'block';
-    filteredContainer.style.opacity = '1';
-    filteredContainer.style.width = '50%';
-    handle.style.left = '50%';
-    modeBtn.textContent = '🔍 Lens Modu';
-    modeBtn.classList.remove('active');
-    
-    updateImageDimensions(); // Reset sonrası boyutları garantiye al
+    Object.keys(state.filters).forEach(k => { if(filters[k]) filters[k].value = state.filters[k]; });
+    drawCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+    applyFilters(); applyTransforms();
+    core.overlayLayer.style.clipPath = 'none';
+    drawingCanvas.style.clipPath = 'none';
 }
 
-// Slider hareketi
-function moveHandle(clientX){
-    const rect = container.getBoundingClientRect();
-    const offsetX = Math.min(Math.max(clientX - rect.left, 0), rect.width);
-    handle.style.left = `${offsetX}px`;
-    filteredContainer.style.width = `${offsetX}px`;
-}
-
-function updateLensSize(){
-    if(!lensImg) return;
-    // Lens resmi container boyutuyla aynı olmalı
-    lensImg.style.width = container.offsetWidth + 'px';
-    lensImg.style.height = container.offsetHeight + 'px';
-}
-
-function moveLens(clientX,clientY){
-    const rect = container.getBoundingClientRect();
-    const lensSize = lens.offsetWidth;
-    
-    const x = clientX - rect.left - (lensSize / 2);
-    const y = clientY - rect.top - (lensSize / 2);
-    
-    lens.style.left = `${x}px`;
-    lens.style.top = `${y}px`;
-
-    lensImg.style.left = `${-x}px`;
-    lensImg.style.top = `${-y}px`;
-}
-
-// == 5. Metin ve Sticker ==
-function makeDraggable(el) {
-    let isDraggingEl = false;
-    let startX, startY, initialLeft, initialTop;
-
-    el.addEventListener('mousedown', startDrag);
-    el.addEventListener('touchstart', startDrag, {passive: false});
-
-    function startDrag(e) {
-        if(e.target.classList.contains('remove-btn')) return;
-        isDraggingEl = true;
-        
-        document.querySelectorAll('.draggable-item').forEach(i => i.classList.remove('active'));
-        el.classList.add('active');
-
-        const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
-        const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
-
-        startX = clientX;
-        startY = clientY;
-        initialLeft = el.offsetLeft;
-        initialTop = el.offsetTop;
-
-        document.addEventListener('mousemove', drag);
-        document.addEventListener('mouseup', stopDrag);
-        document.addEventListener('touchmove', drag, {passive: false});
-        document.addEventListener('touchend', stopDrag);
-    }
-
-    function drag(e) {
-        if (!isDraggingEl) return;
-        e.preventDefault();
-        const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
-        const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
-        const dx = clientX - startX;
-        const dy = clientY - startY;
-        el.style.left = `${initialLeft + dx}px`;
-        el.style.top = `${initialTop + dy}px`;
-    }
-
-    function stopDrag() {
-        isDraggingEl = false;
-        document.removeEventListener('mousemove', drag);
-        document.removeEventListener('mouseup', stopDrag);
-        document.removeEventListener('touchmove', drag);
-        document.removeEventListener('touchend', stopDrag);
-    }
-}
-
-addTextBtn.addEventListener('click', () => {
-    const text = textInput.value;
-    if(!text) return;
-    const div = document.createElement('div');
-    div.className = 'draggable-item';
-    div.style.left = '30%'; div.style.top = '30%';
-    
-    const span = document.createElement('div');
-    span.className = 'draggable-text';
-    span.textContent = text;
-    span.style.color = textColorInput.value;
-    span.style.fontSize = textSizeInput.value + 'px';
-    
-    const removeBtn = document.createElement('div');
-    removeBtn.className = 'remove-btn';
-    removeBtn.textContent = 'X';
-    removeBtn.onclick = () => div.remove();
-    
-    div.appendChild(span); div.appendChild(removeBtn);
-    overlayLayer.appendChild(div);
-    makeDraggable(div);
-    textInput.value = '';
-});
-
-window.addSticker = function(emoji) {
-    const div = document.createElement('div');
-    div.className = 'draggable-item';
-    div.style.left = '40%'; div.style.top = '40%';
-    
-    const span = document.createElement('div');
-    span.className = 'draggable-sticker';
-    span.textContent = emoji;
-    
-    const removeBtn = document.createElement('div');
-    removeBtn.className = 'remove-btn';
-    removeBtn.textContent = 'X';
-    removeBtn.onclick = () => div.remove();
-    
-    div.appendChild(span); div.appendChild(removeBtn);
-    overlayLayer.appendChild(div);
-    makeDraggable(div);
-}
-
-// == 6. Kırpma Mantığı ==
-function startCropping() {
-    isCropping = true;
-    // Önce lens modunu kapat
-    if(lensMode) modeBtn.click();
-    
-    appBody.classList.add('cropping');
-    cropContainer.style.display = 'block';
-    
-    const containerRect = container.getBoundingClientRect();
-    const w = containerRect.width;
-    const h = containerRect.height;
-    let cx = cropState.isApplied ? cropState.x : 0;
-    let cy = cropState.isApplied ? cropState.y : 0;
-    let cw = cropState.isApplied ? cropState.w : 100;
-    let ch = cropState.isApplied ? cropState.h : 100;
-
-    cropBox.style.left = (cx / 100 * w) + 'px';
-    cropBox.style.top = (cy / 100 * h) + 'px';
-    cropBox.style.width = (cw / 100 * w) + 'px';
-    cropBox.style.height = (ch / 100 * h) + 'px';
-}
-
-function cancelCropping() {
-    isCropping = false;
-    appBody.classList.remove('cropping');
-    cropContainer.style.display = 'none';
-}
-
-function confirmCropping() {
-    isCropping = false;
-    appBody.classList.remove('cropping');
-    cropContainer.style.display = 'none';
-    
-    const containerRect = container.getBoundingClientRect();
-    const boxRect = cropBox.getBoundingClientRect();
-    const relX = boxRect.left - containerRect.left;
-    const relY = boxRect.top - containerRect.top;
-    
-    let newX = (relX / containerRect.width) * 100;
-    let newY = (relY / containerRect.height) * 100;
-    let newW = (boxRect.width / containerRect.width) * 100;
-    let newH = (boxRect.height / containerRect.height) * 100;
-
-    newX = Math.max(0, newX); newY = Math.max(0, newY);
-    
-    cropState = { x: newX, y: newY, w: newW, h: newH, isApplied: true };
-    applyCropToImages(cropState);
-    saveState();
-}
-
-cropContainer.addEventListener('mousedown', startCropDrag);
-cropContainer.addEventListener('touchstart', startCropDrag, { passive: false });
-
-function startCropDrag(e) {
-    if (!isCropping) return;
-    e.preventDefault(); 
-    const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
-    const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
-    cropStartX = clientX;
-    cropStartY = clientY;
-    
-    const target = e.target;
-    if (target.classList.contains('crop-handle')) {
-        cropDragMode = target.className.split(' ')[1].replace('handle-', '');
-    } else if (target === cropBox) {
-        cropDragMode = 'move';
-    } else {
-        return;
-    }
-
-    originalCropBox = {
-        left: cropBox.offsetLeft,
-        top: cropBox.offsetTop,
-        width: cropBox.offsetWidth,
-        height: cropBox.offsetHeight
-    };
-    
-    document.addEventListener('mousemove', handleCropDrag);
-    document.addEventListener('mouseup', endCropDrag);
-    document.addEventListener('touchmove', handleCropDrag, { passive: false });
-    document.addEventListener('touchend', endCropDrag);
-}
-
-function handleCropDrag(e) {
-    if (!cropDragMode) return;
-    e.preventDefault();
-    const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
-    const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
-    const dx = clientX - cropStartX;
-    const dy = clientY - cropStartY;
-    
-    let { left, top, width, height } = originalCropBox;
-    const maxW = container.offsetWidth;
-    const maxH = container.offsetHeight;
-
-    if (cropDragMode === 'move') {
-        left += dx; top += dy;
-    } else {
-        if (cropDragMode.includes('n')) { height -= dy; top += dy; }
-        if (cropDragMode.includes('s')) { height += dy; }
-        if (cropDragMode.includes('w')) { width -= dx; left += dx; }
-        if (cropDragMode.includes('e')) { width += dx; }
-    }
-    
-    if(width < 20) width = 20; if(height < 20) height = 20;
-    if(left < 0) left = 0; if(top < 0) top = 0;
-    if(left + width > maxW) width = maxW - left;
-    if(top + height > maxH) height = maxH - top;
-
-    cropBox.style.left = left + 'px';
-    cropBox.style.top = top + 'px';
-    cropBox.style.width = width + 'px';
-    cropBox.style.height = height + 'px';
-}
-
-function endCropDrag() {
-    cropDragMode = null;
-    document.removeEventListener('mousemove', handleCropDrag);
-    document.removeEventListener('mouseup', endCropDrag);
-    document.removeEventListener('touchmove', handleCropDrag);
-    document.removeEventListener('touchend', endCropDrag);
-}
-
-// == 7. Olay Dinleyicileri ==
-borderWidthInput.addEventListener('input', (e) => { borderState.width = e.target.value; applyFilters(); });
-borderColorInput.addEventListener('input', (e) => { borderState.color = e.target.value; applyFilters(); });
-tintColorInput.addEventListener('input', (e) => { tintState.color = e.target.value; applyFilters(); });
-tintOpacityInput.addEventListener('input', (e) => { tintState.opacity = e.target.value; applyFilters(); });
-
-undoBtn.addEventListener('click', undo);
-redoBtn.addEventListener('click', redo);
-
-Object.values(filters).forEach(f => {
-    f.addEventListener('input', applyFilters);
-    f.addEventListener('change', saveState);
-});
-
-upload.addEventListener('change', e => { handleFile(e.target.files[0]); });
-container.addEventListener('dragover', e => { e.preventDefault(); container.classList.add('dragover'); });
-container.addEventListener('dragleave', e => { e.preventDefault(); container.classList.remove('dragover'); });
-container.addEventListener('drop', e => {
-    e.preventDefault();
-    container.classList.remove('dragover');
-    handleFile(e.dataTransfer.files[0]);
-});
-
-document.getElementById('reset').addEventListener('click', () => { resetAll(); saveState(); });
-
-modeBtn.addEventListener('click', () => {
-    lensMode = !lensMode;
-    if (lensMode) {
-        lens.style.display = 'block';
-        handle.style.display = 'none';
-        filteredContainer.style.opacity = '0';
-        modeBtn.textContent = '📏 Çubuk Modu';
-        modeBtn.classList.add('active');
-        updateLensSize();
-    } else {
-        lens.style.display = 'none';
-        handle.style.display = 'block';
-        filteredContainer.style.opacity = '1';
-        filteredContainer.style.width = '50%';
-        handle.style.left = '50%';
-        modeBtn.textContent = '🔍 Lens Modu';
-        modeBtn.classList.remove('active');
-    }
-});
-
-container.addEventListener('mousemove', e => { if (lensMode) moveLens(e.clientX, e.clientY); });
-container.addEventListener('touchmove', e => { if (lensMode && e.touches.length > 0) { e.preventDefault(); moveLens(e.touches[0].clientX, e.touches[0].clientY); }});
-
-document.querySelectorAll('.presets button[data-preset]').forEach(btn => {
-    btn.addEventListener('click', () => {
-        Object.keys(filters).forEach(k => filters[k].value = defaultValues[k]);
-        switch (btn.dataset.preset) {
-            case 'bw': filters.grayscale.value = 100; filters.sepia.value = 0; break;
-            case 'sepia': filters.sepia.value = 100; filters.grayscale.value = 0; break;
-            case 'highcontrast': filters.contrast.value = 150; break;
-            case 'vivid': filters.saturate.value = 150; filters.brightness.value = 110; break;
-            case 'vintage': filters.sepia.value = 40; filters.contrast.value=90; filters.brightness.value=110; filters.vignette.value=40; break;
-            case 'kodak': filters.saturate.value=130; filters.contrast.value=120; filters.hue.value=10; break;
-            case 'techno': filters.invert.value=10; filters.saturate.value=150; filters.hue.value=180; break;
-        }
-        applyFilters();
-        saveState();
-    });
-});
-
-rotateRightBtn.addEventListener('click', () => { transformState.rotate = (transformState.rotate + 90) % 360; applyTransforms(); saveState(); });
-rotateLeftBtn.addEventListener('click', () => { transformState.rotate = (transformState.rotate - 90 + 360) % 360; applyTransforms(); saveState(); });
-flipXBtn.addEventListener('click', () => { transformState.scaleX *= -1; applyTransforms(); saveState(); });
-flipYBtn.addEventListener('click', () => { transformState.scaleY *= -1; applyTransforms(); saveState(); });
-
-cropBtn.addEventListener('click', startCropping);
-cancelCropBtn.addEventListener('click', cancelCropping);
-confirmCropBtn.addEventListener('click', confirmCropping);
-
-function handleDragMove(e) {
-    if (isDragging) {
-        e.preventDefault(); 
-        const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
-        moveHandle(clientX);
-    }
-}
-function handleDragEnd() {
-    isDragging = false;
-    document.removeEventListener('mousemove', handleDragMove);
-    document.removeEventListener('mouseup', handleDragEnd);
-    document.removeEventListener('touchmove', handleDragMove);
-    document.removeEventListener('touchend', handleDragEnd);
-}
-function handleDragStart(e) {
-    if (lensMode || isCropping) return;
-    isDragging = true;
-    e.preventDefault(); 
-    document.addEventListener('mousemove', handleDragMove);
-    document.addEventListener('mouseup', handleDragEnd);
-    document.addEventListener('touchmove', handleDragMove, { passive: false });
-    document.addEventListener('touchend', handleDragEnd);
-}
-handle.addEventListener('mousedown', handleDragStart);
-handle.addEventListener('touchstart', handleDragStart, { passive: false });
-
-// == 8. Kaydetme ==
-document.getElementById('save').addEventListener('click', () => {
-    if (!originalImg.src || originalImg.src.includes('dummyimage')) return;
-
-    const currentState = getCurrentState();
-    const naturalW = originalImg.naturalWidth;
-    const naturalH = originalImg.naturalHeight;
-    const crop = currentState.crop;
-    const sx = crop.isApplied ? (naturalW * (crop.x / 100)) : 0;
-    const sy = crop.isApplied ? (naturalH * (crop.y / 100)) : 0;
-    const sWidth = crop.isApplied ? (naturalW * (crop.w / 100)) : naturalW;
-    const sHeight = crop.isApplied ? (naturalH * (crop.h / 100)) : naturalH;
-    
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const isSwapped = (currentState.transform.rotate % 180 !== 0);
-    canvas.width = isSwapped ? sHeight : sWidth;
-    canvas.height = isSwapped ? sWidth : sHeight;
-
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate(currentState.transform.rotate * Math.PI / 180);
-    ctx.scale(currentState.transform.scaleX, currentState.transform.scaleY);
-
-    const f = currentState.filters;
-    ctx.filter = `contrast(${f.contrast}%) brightness(${f.brightness}%) saturate(${f.saturate}%) hue-rotate(${f.hue}deg) sepia(${f.sepia}%) blur(${f.blur}px) invert(${f.invert}%) grayscale(${f.grayscale}%)`;
-
-    ctx.drawImage(originalImg, sx, sy, sWidth, sHeight, -sWidth / 2, -sHeight / 2, sWidth, sHeight);
-    
-    ctx.filter = 'none';
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-    if (f.gamma != 1 || f.sharpen > 0) {
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imgData.data;
-        const gamma = f.gamma != 1 ? (1 / f.gamma) : 1;
-        const sharp = f.sharpen;
-        for (let i = 0; i < data.length; i += 4) {
-            if(gamma !== 1) {
-                data[i] = 255 * Math.pow(data[i] / 255, gamma);
-                data[i + 1] = 255 * Math.pow(data[i + 1] / 255, gamma);
-                data[i + 2] = 255 * Math.pow(data[i + 2] / 255, gamma);
-            }
-            if(sharp > 0 && i > 4) {
-                 data[i] += sharp * (data[i] - data[i-4]);
-                 data[i+1] += sharp * (data[i+1] - data[i-3]);
-                 data[i+2] += sharp * (data[i+2] - data[i-2]);
-            }
-        }
-        ctx.putImageData(imgData, 0, 0);
-    }
-
-    if(tintState.opacity > 0) {
-        ctx.globalCompositeOperation = 'overlay';
-        ctx.fillStyle = tintState.color;
-        ctx.globalAlpha = tintState.opacity / 100;
-        ctx.fillRect(0,0, canvas.width, canvas.height);
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = 1.0;
-    }
-
-    if (f.vignette > 0) {
-        const grad = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) / 1.2);
-        grad.addColorStop(0, 'rgba(0,0,0,0)');
-        grad.addColorStop(1, `rgba(0,0,0,${f.vignette / 100})`);
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-    
-    const containerRect = container.getBoundingClientRect();
-    const scaleFactorX = canvas.width / containerRect.width;
-    const scaleFactorY = canvas.height / containerRect.height;
-    
-    const overlayItems = overlayLayer.querySelectorAll('.draggable-item');
-    overlayItems.forEach(item => {
-        const rect = item.getBoundingClientRect();
-        const relativeX = rect.left - containerRect.left;
-        const relativeY = rect.top - containerRect.top;
-        const canvasX = relativeX * scaleFactorX;
-        const canvasY = relativeY * scaleFactorY;
-        const textDiv = item.querySelector('.draggable-text');
-        const stickerDiv = item.querySelector('.draggable-sticker');
-        
-        if(textDiv) {
-            const fontSize = parseInt(textDiv.style.fontSize) * scaleFactorX; 
-            ctx.font = `bold ${fontSize}px Arial`;
-            ctx.fillStyle = textDiv.style.color;
-            ctx.textBaseline = 'top';
-            ctx.fillText(textDiv.textContent, canvasX + (5 * scaleFactorX), canvasY + (5 * scaleFactorY));
-        } else if(stickerDiv) {
-            const fontSize = 40 * scaleFactorX; 
-            ctx.font = `${fontSize}px Arial`;
-            ctx.textBaseline = 'top';
-            ctx.fillText(stickerDiv.textContent, canvasX, canvasY);
-        }
-    });
-
-    if(borderState.width > 0) {
-        const bw = borderState.width * scaleFactorX; 
-        ctx.strokeStyle = borderState.color;
-        ctx.lineWidth = bw;
-        ctx.strokeRect(bw/2, bw/2, canvas.width - bw, canvas.height - bw);
-    }
-
-    const dataURL = canvas.toDataURL("image/jpeg", 0.9);
-    const a = document.createElement('a');
-    a.href = dataURL;
-    a.download = 'pro_duzenlenmis_resim.jpg';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-});
-
-resetAll();
+document.getElementById('themeBtn').onclick = () => document.body.classList.toggle('dark-mode');
+setupBrush(); updateImageDimensions();
 </script>
 </body>
 </html>
